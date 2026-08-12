@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A股每日复盘</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">A股每日复盘</div>
+    <div class="meta">
+      <span id="asOf">加载中...</span>
+      <span id="refreshState">自动刷新 30s</span>
+    </div>
+    <div class="actions">
+      <button id="refreshBtn" type="button">立即刷新</button>
+      <button id="autoBtn" type="button" class="active">暂停刷新</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="kpis" class="kpi-grid"></section>
+
+    <section class="layout">
+      <div class="col">
+        <section class="panel">
+          <h2>情绪与信号</h2>
+          <div id="emotion" class="emotion"></div>
+          <div id="signals"></div>
+        </section>
+        <section class="panel">
+          <h2>板块强弱</h2>
+          <div id="sectors"></div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="panel">
+          <h2>主力资金榜</h2>
+          <div id="flows"></div>
+        </section>
+        <section class="panel">
+          <h2>涨停梯队 / 观察池</h2>
+          <div id="ztpool"></div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="panel">
+          <h2>今日快讯</h2>
+          <div id="news"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="errors" class="errors"></section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
