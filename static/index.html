@@ -19,39 +19,91 @@
     </div>
   </header>
 
+  <nav class="tabbar">
+    <button class="tab active" data-tab="daily" type="button">每日复盘</button>
+    <button class="tab" data-tab="realtime" type="button">实时盘口</button>
+  </nav>
+
   <main>
-    <section id="kpis" class="kpi-grid"></section>
+    <section id="page-daily" class="page">
+      <section id="kpis" class="kpi-grid"></section>
 
-    <section class="layout">
-      <div class="col">
-        <section class="panel">
-          <h2>情绪与信号</h2>
-          <div id="emotion" class="emotion"></div>
-          <div id="signals"></div>
-        </section>
-        <section class="panel">
-          <h2>板块强弱</h2>
-          <div id="sectors"></div>
-        </section>
-      </div>
+      <section class="layout">
+        <div class="col">
+          <section class="panel">
+            <h2>情绪与信号</h2>
+            <div id="emotion" class="emotion"></div>
+            <div id="signals"></div>
+          </section>
+          <section class="panel">
+            <h2>板块强弱</h2>
+            <div id="sectors"></div>
+          </section>
+        </div>
 
-      <div class="col">
-        <section class="panel">
-          <h2>主力资金榜</h2>
-          <div id="flows"></div>
-        </section>
-        <section class="panel">
-          <h2>涨停梯队 / 观察池</h2>
-          <div id="ztpool"></div>
-        </section>
-      </div>
+        <div class="col">
+          <section class="panel">
+            <h2>主力资金榜</h2>
+            <div id="flows"></div>
+          </section>
+          <section class="panel">
+            <h2>涨停梯队 / 观察池</h2>
+            <div id="ztpool"></div>
+          </section>
+        </div>
 
-      <div class="col">
-        <section class="panel">
-          <h2>今日快讯</h2>
-          <div id="news"></div>
-        </section>
-      </div>
+        <div class="col">
+          <section class="panel">
+            <h2>今日快讯</h2>
+            <div id="news"></div>
+          </section>
+        </div>
+      </section>
+    </section>
+
+    <section id="page-realtime" class="page hidden">
+      <section class="rt-top">
+        <div class="panel">
+          <h2>大盘情绪 <span id="rtState" class="rt-state">加载中...</span></h2>
+          <div id="rtPhase" class="phase-box"></div>
+          <div id="rtIndices"></div>
+          <div id="rtEmotion" class="emotion"></div>
+          <div id="rtYesterday"></div>
+          <div id="rtSignals"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>板块过滤器 <span class="sub">涨幅 / 主力净流入 / 板块涨停数 / 龙头是否封板</span></h2>
+        <div id="rtSectors"></div>
+      </section>
+
+      <section class="panel">
+        <h2>盘中确认 / 观察池 <span class="sub">自动轮询量比、主力净流入、首封时间、炸板数</span></h2>
+        <div id="rtWatchlist"></div>
+      </section>
+
+      <section class="panel">
+        <h2>盘中节奏</h2>
+        <div class="phase-grid">
+          <div class="phase-step"><b>9:25-9:30</b><span>看竞价高开、量比、板块联动</span></div>
+          <div class="phase-step"><b>9:30-10:00</b><span>资金持续流入、板块涨停扩散，等第一次回踩不破</span></div>
+          <div class="phase-step"><b>10:00-11:30</b><span>板块形成合力才做，早盘冲高回落且运行在均价线下就放弃</span></div>
+          <div class="phase-step"><b>13:00-14:30</b><span>看午后分歧转一致、炸板后回封</span></div>
+          <div class="phase-step"><b>14:30 后</b><span>看尾盘封单稳不稳，强势票尾盘跳水要警惕次日低开</span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>盘中最容易犯的错</h2>
+        <ul class="mistake-list">
+          <li>只看个股不看板块</li>
+          <li>追直线拉升</li>
+          <li>高开低走还一路补仓</li>
+          <li>没有止损位就买</li>
+          <li>盘中临时起意，而不是从复盘池里挑票</li>
+        </ul>
+      </section>
     </section>
 
     <section id="errors" class="errors"></section>
