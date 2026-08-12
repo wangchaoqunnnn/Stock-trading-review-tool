@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>短线监控与复盘</title>
+<style>
+:root {
+  --bg: #f4f6f8;
+  --fg: #1b2733;
+  --muted: #5b6b7a;
+  --border: #dbe2e8;
+  --card: #ffffff;
+  --card-fg: #1b2733;
+  --primary: #1469b3;
+  --primary-fg: #ffffff;
+  --up: #d64545;
+  --down: #1f9d68;
+  --warn: #b45309;
+  --ok: #1f9d68;
+  --accent: #eef4fb;
+  --shadow: 0 1px 2px rgba(16,24,32,.06);
+  --radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10161d;
+    --fg: #e6edf3;
+    --muted: #93a2b1;
+    --border: #27343f;
+    --card: #17212b;
+    --card-fg: #e6edf3;
+    --accent: #1d2b39;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.45 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+.wrap { max-width: 1280px; margin: 0 auto; padding: 16px; }
+header.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+header.top h1 { margin: 0; font-size: 20px; font-weight: 500; }
+.top-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status.live::before { background: var(--ok); }
+.status.paused::before { background: var(--warn); }
+.status.error::before { background: var(--up); }
+button, select {
+  font: inherit;
+  color: inherit;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+button:hover, select:hover { border-color: var(--primary); }
+button svg { width: 15px; height: 15px; vertical-align: -2px; }
+.tabbar { display: flex; gap: 6px; margin: 12px 0 4px; border-bottom: 1px solid var(--border); }
+.tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  color: var(--muted);
+  padding: 8px 14px;
+  font-weight: 500;
+}
+.tab[aria-pressed="true"] {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--accent);
+}
+.review-frame {
+  width: 100%;
+  height: 88vh;
+  min-height: 640px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  display: block;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.chip {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  color: var(--muted);
+}
+.chip b { color: var(--fg); font-weight: 500; }
+.chip .up { color: var(--up); }
+.chip .down { color: var(--down); }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+}
+.stat .label { color: var(--muted); font-size: 12px; }
+.stat .value { font-size: 20px; font-weight: 500; margin-top: 4px; word-break: break-word; }
+.stat .ctx { color: var(--muted); font-size: 12px; margin-top: 2px; }
+section { margin: 18px 0; }
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+h2 { margin: 0; font-size: 15px; font-weight: 500; }
+.muted { color: var(--muted); font-size: 12px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filters label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--fg); }
+.filters input { accent-color: var(--primary); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px; }
+th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
+th { color: var(--muted); font-weight: 500; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.up { color: var(--up); }
+.down { color: var(--down); }
+.flat { color: var(--muted); }
+.hot td { background: var(--accent); }
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  margin-left: 4px;
+}
+.badge.on { color: var(--ok); border-color: var(--ok); }
+.confirm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+.confirm-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.confirm-item .ok { color: var(--ok); font-weight: 500; }
+.confirm-item .no { color: var(--up); font-weight: 500; }
+.confirm-item .val { color: var(--muted); font-size: 12px; }
+.error-bar {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--up);
+  color: var(--up);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stat .value { font-size: 17px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>短线监控与复盘</h1>
+    <div class="top-actions">
+      <span id="clock" class="status">--:--:--</span>
+      <span id="status" class="status">连接中</span>
+      <label class="muted" for="interval">刷新</label>
+      <select id="interval">
+        <option value="5">5秒</option>
+        <option value="10" selected>10秒</option>
+        <option value="20">20秒</option>
+        <option value="30">30秒</option>
+        <option value="60">60秒</option>
+      </select>
+      <button id="pauseBtn" type="button" aria-label="暂停自动刷新">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+      </button>
+      <button id="refreshBtn" type="button" aria-label="立即刷新">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="tabbar" aria-label="视图切换">
+    <button type="button" class="tab" data-tab="monitor" aria-pressed="true">盘中监控</button>
+    <button type="button" class="tab" data-tab="review" aria-pressed="false">复盘筛选</button>
+  </nav>
+
+  <div id="tabMonitor">
+    <div class="chips" id="indexChips"></div>
+
+    <div class="stats">
+      <div class="stat"><div class="label">涨停家数</div><div class="value" id="stTotal">-</div></div>
+      <div class="stat"><div class="label">炸板率</div><div class="value" id="stZha">-</div><div class="ctx" id="stZhaCtx"></div></div>
+      <div class="stat"><div class="label">上涨 / 下跌</div><div class="value" id="stBreadth">-</div></div>
+      <div class="stat"><div class="label">最强板块</div><div class="value" id="stSector">-</div><div class="ctx" id="stSectorCtx"></div></div>
+    </div>
+
+    <section>
+      <div class="section-head"><h2>确认条件</h2><span class="muted" id="confirmTime"></span></div>
+      <div class="confirm-grid" id="confirmList"></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>板块涨停分布</h2><span class="muted" id="sectorCount"></span></div>
+      <div class="table-wrap">
+        <table class="table-sm">
+          <thead>
+            <tr>
+              <th>板块</th>
+              <th class="num">涨停</th>
+              <th class="num">早盘封板</th>
+              <th class="num">未炸板</th>
+              <th class="num">最高连板</th>
+              <th class="num">板块涨跌%</th>
+              <th class="num">主力净流入(亿)</th>
+              <th class="num">封单合计(亿)</th>
+            </tr>
+          </thead>
+          <tbody id="sectorBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>涨停个股监控</h2>
+        <div class="filters">
+          <label class="muted" for="sortSel">排序</label>
+          <select id="sortSel">
+            <option value="fbt">首封时间</option>
+            <option value="flow">主力净流入</option>
+            <option value="vr">量比</option>
+            <option value="zbc">炸板次数</option>
+            <option value="lbc">连板数</option>
+            <option value="fund">封单金额</option>
+          </select>
+          <label><input type="checkbox" id="fNoZha"> 未炸板</label>
+          <label><input type="checkbox" id="fEarly"> 早盘封板</label>
+          <label><input type="checkbox" id="fVR"> 量比≥1.5</label>
+          <label><input type="checkbox" id="fSectorFlow"> 板块资金为正</label>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table-sm">
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>板块</th>
+              <th class="num">涨跌%</th>
+              <th class="num">连板</th>
+              <th class="num">首封</th>
+              <th class="num">炸板</th>
+              <th class="num">封单(亿)</th>
+              <th class="num">封单/流通%</th>
+              <th class="num">换手%</th>
+              <th class="num">量比</th>
+              <th class="num">主力净流入(亿)</th>
+              <th>信号</th>
+            </tr>
+          </thead>
+          <tbody id="stockBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="tabReview" hidden>
+    <iframe class="review-frame" src="http://127.0.0.1:8787/" title="复盘筛选"></iframe>
+  </div>
+
+  <div class="error-bar" id="errorBar" hidden></div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let timer = null;
+let paused = false;
+let lastData = null;
+let lastFetchOk = false;
+
+const fmtFbt = (v) => {
+  if (!v && v !== 0) return "-";
+  const s = String(v).padStart(6, "0");
+  return s.slice(0, 2) + ":" + s.slice(2, 4) + ":" + s.slice(4, 6);
+};
+const num = (v, d = 2) => (v === null || v === undefined || isNaN(v)) ? "-" : Number(v).toFixed(d);
+const pctClass = (v) => (v > 0 ? "up" : v < 0 ? "down" : "flat");
+
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((b) => {
+    b.setAttribute("aria-pressed", b.dataset.tab === name ? "true" : "false");
+  });
+  $("tabMonitor").hidden = name !== "monitor";
+  $("tabReview").hidden = name !== "review";
+}
+document.querySelectorAll(".tab").forEach((b) => {
+  b.addEventListener("click", () => switchTab(b.dataset.tab));
+});
+
+function setStatus(state, text) {
+  const el = $("status");
+  el.className = "status " + state;
+  el.childNodes[el.childNodes.length - 1].textContent = " " + text;
+}
+
+async function loadSnapshot() {
+  try {
+    const resp = await fetch("/api/snapshot", { cache: "no-store" });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    lastData = data;
+    lastFetchOk = true;
+    render(data);
+    setStatus("live", "更新 " + (data.time ? data.time.slice(11, 19) : ""));
+  } catch (err) {
+    lastFetchOk = false;
+    setStatus("error", "获取失败");
+    $("errorBar").hidden = false;
+    $("errorBar").textContent = "数据获取失败：" + err.message;
+  }
+}
+
+function buildChecks(data) {
+  const stocks = data.stocks || [];
+  const sectors = data.sectors || [];
+  const topZt = sectors.length ? sectors[0].zt_count : 0;
+  const posFlow = sectors.filter((s) => (s.board_flow || 0) > 0).length;
+  const early = stocks.filter((s) => s.fbt <= 100000).length;
+  const noZha = stocks.filter((s) => s.zbc === 0).length;
+  const vrUp = stocks.filter((s) => s.vr !== null && s.vr !== undefined && s.vr >= 1.5).length;
+  const jj = stocks.filter((s) => s.fbt <= 92500).length;
+  return [
+    { label: "板块涨停≥3家", ok: topZt >= 3, val: "最高 " + topZt + " 家" },
+    { label: "板块主力净流入>0", ok: posFlow > 0, val: posFlow + " 个板块" },
+    { label: "竞价/早盘封板", ok: early > 0, val: early + " 只" },
+    { label: "未炸板票", ok: noZha > 0, val: noZha + " 只" },
+    { label: "量比放大/竞价封板", ok: vrUp + jj > 0, val: (vrUp + jj) + " 只" },
+    { label: "炸板率<30%", ok: data.zha_ratio < 30, val: num(data.zha_ratio, 1) + "%" },
+  ];
+}
+
+function renderConfirmList(id, data) {
+  $(id).innerHTML = buildChecks(data).map((c) =>
+    `<div class="confirm-item"><span>${c.label}</span><span class="${c.ok ? "ok" : "no"}">${c.ok ? "通过" : "未达"} <span class="val">${c.val}</span></span></div>`
+  ).join("");
+}
+
+function render(data) {
+  $("errorBar").hidden = true;
+  $("clock").textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  $("confirmTime").textContent = "数据时间 " + (data.time || "-");
+
+  $("stTotal").textContent = data.total;
+  $("stZha").textContent = num(data.zha_ratio, 1) + "%";
+  $("stZhaCtx").textContent = "炸板 " + data.zha_count + " 家";
+  const b = data.breadth || {};
+  $("stBreadth").textContent = num(b.up, 0) + " / " + num(b.down, 0);
+  const topSector = data.sectors && data.sectors[0];
+  if (topSector) {
+    $("stSector").textContent = topSector.sector;
+    $("stSectorCtx").textContent = topSector.zt_count + " 家涨停";
+  } else {
+    $("stSector").textContent = "-";
+    $("stSectorCtx").textContent = "";
+  }
+
+  $("indexChips").innerHTML = (data.indices || []).map((x) =>
+    `<span class="chip">${x.name} <b class="${pctClass(x.pct)}">${num(x.pct, 2)}%</b></span>`
+  ).join("");
+
+  renderConfirmList("confirmList", data);
+  renderSectors(data.sectors || [], "sectorBody");
+  $("sectorCount").textContent = "共 " + (data.sectors || []).length + " 个板块";
+  renderStocks();
+}
+
+function renderSectors(sectors, bodyId) {
+  const rows = sectors.slice().sort((a, b) => {
+    if (b.zt_count !== a.zt_count) return b.zt_count - a.zt_count;
+    return (b.board_flow || 0) - (a.board_flow || 0);
+  });
+  $(bodyId).innerHTML = rows.map((s) => {
+    const pct = s.board_pct === null || s.board_pct === undefined ? "-" : num(s.board_pct, 2);
+    const flow = s.board_flow === null || s.board_flow === undefined ? "-" : num(s.board_flow, 2);
+    return `<tr>
+      <td>${s.sector}</td>
+      <td class="num"><b>${s.zt_count}</b></td>
+      <td class="num">${s.early}</td>
+      <td class="num">${s.no_zha}</td>
+      <td class="num">${s.max_lbc}</td>
+      <td class="num ${pctClass(s.board_pct)}">${pct}</td>
+      <td class="num ${(s.board_flow || 0) >= 0 ? "up" : "down"}">${flow}</td>
+      <td class="num">${num(s.fund, 2)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function activeStocks() {
+  const data = lastData;
+  if (!data) return [];
+  let stocks = data.stocks.slice();
+  const sortKey = $("sortSel").value;
+  const order = {
+    fbt: (a, b) => a.fbt - b.fbt,
+    flow: (a, b) => (b.flow || 0) - (a.flow || 0),
+    vr: (a, b) => (b.vr || 0) - (a.vr || 0),
+    zbc: (a, b) => a.zbc - b.zbc,
+    lbc: (a, b) => b.lbc - a.lbc,
+    fund: (a, b) => (b.fund || 0) - (a.fund || 0),
+  };
+  stocks.sort(order[sortKey] || order.fbt);
+  const flowPos = new Set((data.sectors || []).filter((s) => (s.board_flow || 0) > 0).map((s) => s.sector));
+  if ($("fNoZha").checked) stocks = stocks.filter((s) => s.zbc === 0);
+  if ($("fEarly").checked) stocks = stocks.filter((s) => s.fbt <= 100000);
+  if ($("fVR").checked) stocks = stocks.filter((s) => s.vr !== null && s.vr !== undefined && s.vr >= 1.5);
+  if ($("fSectorFlow").checked) stocks = stocks.filter((s) => flowPos.has(s.sector));
+  return stocks;
+}
+
+function renderStocks() {
+  const stocks = activeStocks();
+  $("stockBody").innerHTML = stocks.map((s) => stockRow(s)).join("");
+}
+
+function stockRow(s) {
+  const hot = s.fbt <= 92500 || (s.zbc === 0 && s.vr !== null && s.vr !== undefined && s.vr >= 1.5);
+  const tags = (s.tags || []).map((t) => `<span class="badge on">${t}</span>`).join("");
+  return `<tr${hot ? ' class="hot"' : ""}>
+    <td>${s.code}</td>
+    <td>${s.name}</td>
+    <td>${s.sector}</td>
+    <td class="num ${pctClass(s.pct)}">${num(s.pct, 2)}</td>
+    <td class="num">${s.lbc}</td>
+    <td class="num">${fmtFbt(s.fbt)}</td>
+    <td class="num ${s.zbc > 0 ? "up" : ""}">${s.zbc}</td>
+    <td class="num">${num(s.fund, 2)}</td>
+    <td class="num">${num(s.seal_ratio, 2)}</td>
+    <td class="num">${num(s.hs, 2)}</td>
+    <td class="num">${num(s.vr, 2)}</td>
+    <td class="num ${(s.flow || 0) >= 0 ? "up" : "down"}">${num(s.flow, 2)}</td>
+    <td>${tags}</td>
+  </tr>`;
+}
+
+function startTimer() {
+  if (timer) clearInterval(timer);
+  const sec = parseInt($("interval").value, 10) || 10;
+  timer = setInterval(() => {
+    if (!paused) loadSnapshot();
+  }, sec * 1000);
+}
+
+$("interval").addEventListener("change", startTimer);
+$("refreshBtn").addEventListener("click", () => loadSnapshot());
+$("pauseBtn").addEventListener("click", () => {
+  paused = !paused;
+  $("pauseBtn").innerHTML = paused
+    ? '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+  setStatus(paused ? "paused" : lastFetchOk ? "live" : "error", paused ? "已暂停" : "运行中");
+});
+["sortSel", "fNoZha", "fEarly", "fVR", "fSectorFlow"].forEach((id) => {
+  $(id).addEventListener("change", () => renderStocks());
+});
+
+loadSnapshot();
+startTimer();
+</script>
+</body>
+</html>
