@@ -811,34 +811,64 @@ def fetch_realtime():
 REALTIME_CACHE = SnapshotCache(ttl=30, fetcher=fetch_realtime)
 
 def fetch_kline_hist(code):
-    secid = ("1." if code.startswith("6") else "0.") + code
-    params = {
-        "secid": secid,
-        "fields1": "f1,f2,f3,f4,f5,f6",
-        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-        "klt": 101, "fqt": 1, "beg": "20260701", "end": "20500101",
-    }
-    url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
-    for i in range(3):
+    prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
+    symbol = prefix + code
+    rows = []
+    try:
+        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": f"{symbol},day,,,45,qfq"})
+        data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"})
+        node = (data.get("data") or {}).get(symbol) or {}
+        rows = node.get("qfqday") or node.get("day") or []
+    except Exception:
+        rows = []
+    if not rows:
         try:
-            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"})["data"]
-            out = []
-            for line in (data.get("klines") or []):
-                p = line.split(",")
-                if len(p) < 11:
-                    continue
-                out.append({
-                    "date": p[0],
-                    "open": to_num(p[1]), "close": to_num(p[2]),
-                    "high": to_num(p[3]), "low": to_num(p[4]),
-                    "volume": to_num(p[5]), "amount": to_num(p[6]),
-                })
-            return out
+            url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": 45})
+            text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"})
+            m = re.search(r"\[(.*)\]", text, re.S)
+            if m:
+                rows = json.loads("[" + m.group(1) + "]")
         except Exception:
-            if i == 2:
-                raise
-            time.sleep(0.6)
-    return []
+            rows = []
+    out = []
+    for row in rows[-45:]:
+        try:
+            if isinstance(row, list):
+                date = row[0]
+                open_ = to_num(row[1]); close = to_num(row[2])
+                high = to_num(row[3]); low = to_num(row[4]); volume = to_num(row[5])
+            else:
+                date = row.get("day")
+                open_ = to_num(row.get("open")); close = to_num(row.get("close"))
+                high = to_num(row.get("high")); low = to_num(row.get("low")); volume = to_num(row.get("volume"))
+            pct = 0.0
+            if out:
+                prev_close = out[-1]["close"]
+                pct = round((close / prev_close - 1) * 100, 2) if prev_close else 0.0
+            out.append({"date": date, "open": open_, "close": close, "high": high, "low": low, "volume": volume, "amount": 0.0, "pct": pct})
+        except Exception:
+            continue
+    if len(out) >= 25:
+        return out
+    try:
+        secid = ("1." if code.startswith("6") else "0.") + code
+        params = {
+            "secid": secid,
+            "fields1": "f1,f2,f3,f4,f5,f6",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+            "klt": 101, "fqt": 1, "beg": "20260701", "end": "20500101",
+        }
+        url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
+        data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"})["data"]
+        out = []
+        for line in (data.get("klines") or []):
+            p = line.split(",")
+            if len(p) < 11:
+                continue
+            out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
+        return out
+    except Exception:
+        return []
 
 
 def fetch_volume_price_scan():
@@ -991,6 +1021,153 @@ def fetch_volume_price_scan():
 
 
 VOLPRICE_CACHE = SnapshotCache(ttl=120, fetcher=fetch_volume_price_scan)
+def fetch_pullback_scan():
+    def safe(name, fn):
+        try:
+            return name, fn()
+        except Exception as exc:
+            return name, {"error": f"{type(exc).__name__}: {exc}"}
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {
+            "stocks": ex.submit(safe, "stocks", lambda: fetch_paged(ALL_A_FS, "f2,f3,f6,f8,f10,f12,f14,f15,f16,f18,f22,f62,f184,f100", limit=6000)),
+            "industry": ex.submit(safe, "industry", fetch_industry_boards),
+            "indices": ex.submit(safe, "indices", fetch_indices),
+            "breadth": ex.submit(safe, "breadth", fetch_breadth),
+            "zt": ex.submit(safe, "zt", fetch_zt_pool),
+            "zb": ex.submit(safe, "zb", fetch_zb_pool),
+            "dt": ex.submit(safe, "dt", fetch_dt_pool),
+            "amount": ex.submit(safe, "amount", fetch_market_amount),
+        }
+        results = {k: f.result() for k, f in futures.items()}
+
+    errors = [str(v.get("error")) for v in results.values() if isinstance(v, dict) and "error" in v]
+    stocks = results["stocks"][1] if not isinstance(results["stocks"], dict) else []
+    industry = results["industry"][1] if not isinstance(results["industry"], dict) else []
+    indices = results["indices"][1] if not isinstance(results["indices"], dict) else []
+    breadth = results["breadth"][1] if not isinstance(results["breadth"], dict) else {"up": 0, "down": 0, "flat": 0}
+    zt = results["zt"][1] if not isinstance(results["zt"], dict) else {"tc": 0, "pool": []}
+    zb = results["zb"][1] if not isinstance(results["zb"], dict) else {"tc": 0, "pool": []}
+    dt = results["dt"][1] if not isinstance(results["dt"], dict) else {"tc": 0, "pool": []}
+    amount = results["amount"][1] if not isinstance(results["amount"], dict) else None
+
+    candidates = []
+    for r in stocks:
+        amount_v = to_num(r.get("f6"))
+        pct = to_num(r.get("f3"))
+        vr = to_num(r.get("f10"))
+        if amount_v < 500000000 or not (-5 <= pct <= 3) or vr > 1.2:
+            continue
+        candidates.append({
+            "code": r.get("f12"),
+            "name": r.get("f14"),
+            "close": to_num(r.get("f2")),
+            "pct": pct,
+            "speed": to_num(r.get("f22")),
+            "vol_ratio": vr,
+            "turnover": to_num(r.get("f8")),
+            "amount_yi": round(amount_v / 100000000, 2),
+            "main_flow": round(to_num(r.get("f62")) / 100000000, 2),
+            "industry": r.get("f100"),
+        })
+    candidates.sort(key=lambda x: -x["amount_yi"])
+    candidates = candidates[:120]
+
+    def enrich(c):
+        try:
+            c["hist"] = fetch_kline_hist(c["code"])
+        except Exception:
+            c["hist"] = []
+        return c
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        candidates = list(ex.map(enrich, candidates))
+
+    zt_by_industry = {}
+    for x in (zt.get("pool") or []):
+        b = x.get("hybk") or "未知"
+        zt_by_industry[b] = zt_by_industry.get(b, 0) + 1
+    hot_set = {
+        b["name"] for b in industry
+        if (b.get("flow_yi") or 0) > 0 and (b.get("pct") or 0) > 0
+        or zt_by_industry.get(b["name"], 0) >= 1
+    }
+    board_flow_map = {b["name"]: b.get("flow_yi", 0) for b in industry}
+
+    results = []
+    for c in candidates:
+        hist = c.get("hist") or []
+        if len(hist) < 25:
+            continue
+        code = c["code"]
+        threshold = 29.5 if code.startswith(("4", "8", "92")) else 19.5 if code.startswith(("3", "68")) else 9.8
+        last20 = hist[-20:]
+        limit_idx = None
+        for i in range(len(last20) - 1, -1, -1):
+            if (last20[i].get("pct") or 0) >= threshold:
+                limit_idx = i
+                break
+        if limit_idx is None:
+            continue
+        limit_bar = last20[limit_idx]
+        today = hist[-1]
+        vols = [h["volume"] for h in hist]
+        closes = [h["close"] for h in hist]
+        lows = [h["low"] for h in hist]
+        prev5 = vols[-6:-1]
+        prev5_avg = sum(prev5) / len(prev5) if prev5 else 0
+        hist_vr = round(today["volume"] / prev5_avg, 2) if prev5_avg else None
+        if hist_vr is None or hist_vr > 0.85:
+            continue
+        ma20 = sum(closes[-20:]) / 20
+        ma20_prev5 = sum(closes[-25:-5]) / 20 if len(closes) >= 25 else None
+        close = today["close"]
+        if close <= ma20:
+            continue
+        if ma20_prev5 is not None and ma20 <= ma20_prev5:
+            continue
+        recent_low = min(lows[-5:])
+        prior_low = min(lows[-15:-5])
+        if recent_low <= prior_low * 0.98:
+            continue
+        support = min(limit_bar["low"], limit_bar["close"])
+        if today["low"] < support * 0.98:
+            continue
+        days_since = (len(last20) - 1) - limit_idx
+        if days_since <= 0:
+            continue
+        hot = c.get("industry") in hot_set
+        shrink = round((1 - hist_vr) * 10, 1) if hist_vr else 5
+        trend = (5 if close > ma20 else 0) + (3 if (ma20_prev5 is not None and ma20 > ma20_prev5) else 0)
+        recency = 5 if days_since <= 5 else 2 if days_since <= 10 else 1
+        score = round(shrink + trend + recency + (8 if hot else 0), 1)
+        tags = ["20日涨停", "上升趋势", "缩量回踩"]
+        if hot:
+            tags.append("市场热点")
+        results.append({
+            "code": code, "name": c["name"],
+            "price": round(close, 2), "pct": c["pct"], "speed": c["speed"],
+            "vol_ratio": c["vol_ratio"], "hist_vol_ratio": hist_vr,
+            "turnover": c["turnover"], "amount_yi": c["amount_yi"],
+            "main_flow": c["main_flow"], "industry": c.get("industry"),
+            "ma20": round(ma20, 2), "board_flow": round(board_flow_map.get(c.get("industry"), 0), 2),
+            "limit_date": limit_bar["date"], "limit_pct": round(limit_bar.get("pct") or 0, 2),
+            "days_since": days_since, "hot": hot, "score": score, "tags": tags,
+        })
+    results.sort(key=lambda x: -x["score"])
+    emotion = compute_emotion(zt, zb, dt)
+    hot_boards = sorted(industry, key=lambda x: -(x.get("flow_yi") or 0))[:10]
+    return {
+        "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "market": {
+            "indices": indices, "breadth": breadth, "emotion": emotion, "amount_yi": amount,
+        },
+        "hot_boards": hot_boards,
+        "scanned": len(candidates), "matched": len(results), "stocks": results,
+        "errors": errors,
+    }
+
+
+PULLBACK_CACHE = SnapshotCache(ttl=120, fetcher=fetch_pullback_scan)
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
@@ -1035,6 +1212,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(VOLPRICE_CACHE.get())
         elif path == "/api/volprice_refresh":
             self._send_json(VOLPRICE_CACHE.get(force=True))
+        elif path == "/api/pullback":
+            self._send_json(PULLBACK_CACHE.get())
+        elif path == "/api/pullback_refresh":
+            self._send_json(PULLBACK_CACHE.get(force=True))
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         elif path == "/app.js":

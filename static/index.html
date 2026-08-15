@@ -23,6 +23,7 @@
     <button class="tab active" data-tab="daily" type="button">每日复盘</button>
     <button class="tab" data-tab="realtime" type="button">实时盘口</button>
     <button class="tab" data-tab="volprice" type="button">量价异动</button>
+    <button class="tab" data-tab="pullback" type="button">涨停回踩</button>
   </nav>
 
   <main>
@@ -117,6 +118,19 @@
         <h2>量价异动分类池 <span class="sub">自动扫全A：量比 / 换手 / 成交额 / 5日均量 / MA20 / 20日新高 / 板块资金</span></h2>
         <div id="vpSummary"></div>
         <div id="vpCategories"></div>
+      </section>
+    </section>
+
+    <section id="page-pullback" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="pbState" class="rt-state">加载中...</span></h2>
+        <div id="pbMarket"></div>
+        <div id="pbBoards"></div>
+      </section>
+      <section class="panel">
+        <h2>涨停回踩池 <span class="sub">20日内涨停 + 上升趋势 + 缩量回踩不破 + 市场热点</span></h2>
+        <div id="pbSummary"></div>
+        <div id="pbList"></div>
       </section>
     </section>
 
