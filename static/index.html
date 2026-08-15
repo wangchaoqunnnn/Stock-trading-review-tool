@@ -22,6 +22,7 @@
   <nav class="tabbar">
     <button class="tab active" data-tab="daily" type="button">每日复盘</button>
     <button class="tab" data-tab="realtime" type="button">实时盘口</button>
+    <button class="tab" data-tab="volprice" type="button">量价异动</button>
   </nav>
 
   <main>
@@ -103,6 +104,19 @@
           <li>没有止损位就买</li>
           <li>盘中临时起意，而不是从复盘池里挑票</li>
         </ul>
+      </section>
+    </section>
+
+    <section id="page-volprice" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="vpState" class="rt-state">加载中...</span></h2>
+        <div id="vpMarket"></div>
+        <div id="vpBoards"></div>
+      </section>
+      <section class="panel">
+        <h2>量价异动分类池 <span class="sub">自动扫全A：量比 / 换手 / 成交额 / 5日均量 / MA20 / 20日新高 / 板块资金</span></h2>
+        <div id="vpSummary"></div>
+        <div id="vpCategories"></div>
       </section>
     </section>
 
