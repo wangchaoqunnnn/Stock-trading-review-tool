@@ -203,14 +203,53 @@ python server.py 8788
 ## 目录结构
 
 ```text
-server.py              # 本地 HTTP 服务 + 东方财富数据抓取
+server.py              # 本地 HTTP 服务入口（路由 + 缓存 + 启动），API 与页面路径保持不变
+stockreview/           # 后端逻辑包（由原 server.py 单文件拆分而来）
+  config.py            #   全局配置常量
+  utils.py             #   通用数值工具
+  net.py               #   东方财富 HTTP 请求封装（重试/分页）
+  em.py                #   东方财富数据抓取（指数/涨跌分布/涨停池/板块/资金/快讯/K线）
+  analysis.py          #   纯计算逻辑（情绪指标/信号检查表/观察池/量价分类/回踩评分）
+  realtime.py          #   实时盘口聚合
+  volprice.py          #   量价异动扫描
+  pullback.py          #   涨停回踩扫描
+  snapshot.py          #   每日复盘快照聚合
+  cache.py             #   TTL 内存缓存
 static/
   index.html           # 页面结构
-  app.js               # 前端渲染与自动刷新
   style.css            # 样式
-scripts/               # 分析辅助脚本
+  js/                  # 前端 ES 模块（由原 app.js 拆分而来）
+    main.js            #   应用入口：Tab 切换、自动刷新、按钮事件
+    utils.js           #   通用工具函数
+    state.js           #   跨模块共享状态
+    daily.js           #   每日复盘渲染
+    realtime.js        #   实时盘口渲染
+    volprice.js        #   量价异动渲染
+    pullback.js        #   涨停回踩渲染
+intraday_monitor/      # 盘中实时监控子应用（后端复用 stockreview 包）
+tests/                 # 重构等价性验证
+  equivalence_test.py         # 主应用：git HEAD 原版 vs 重构版，离线假数据逐字段比对
+  monitor_equivalence_test.py # 盘中监控：同上
+  compare_schema.py           # 结构对比工具
+  verify_schema.py            # 在线验证：抓取运行中服务端点并与基线 schema 对比
+  fixtures/                   # 各端点基线 schema（结构回归基准）
+scripts/               # 分析辅助脚本（未改动）
 run_server.bat         # Windows 一键启动
 ```
+
+## 重构说明
+
+2025 年对代码进行了纯结构重构，前后端对外功能保持不变：
+
+- 后端：原 `server.py`（1200+ 行单文件）按职责拆分为 `stockreview/` 包，
+  HTTP 路由、API 路径、JSON 响应结构与缓存 TTL 均未改变。
+- 前端：原 `static/app.js`（单文件）拆分为 `static/js/` 下的 ES 模块，
+  页面结构、渲染内容与交互行为未改变。
+- 盘中监控后端改为复用 `stockreview` 包的 HTTP 请求与配置常量，
+  快照组装逻辑与输出结构未改变。
+- 验证：`tests/equivalence_test.py` 用相同离线假数据分别驱动
+  git HEAD 原版与重构版，逐字段断言输出一致；`tests/verify_schema.py`
+  对运行中服务的各 API 端点做基线结构比对。
 
 ## 数据说明
 

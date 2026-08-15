@@ -1,44 +1,36 @@
 # -*- coding: utf-8 -*-
-"""盘中实时监控后端：代理东方财富数据并托管前端页面。"""
+"""盘中实时监控后端：代理东方财富数据并托管前端页面。
+
+功能与重构前一致，仅将重复的 HTTP 请求封装与配置常量收敛到
+仓库根目录的 stockreview 包（net/config），快照组装逻辑保持不变。
+"""
 import json
 import os
 import sys
 import threading
 import time
 import urllib.parse
-import urllib.request
 from collections import defaultdict
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# 使仓库根目录的 stockreview 包可导入（本目录不一定在 sys.path 中）
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from stockreview.config import EMEX_UT, UA
+from stockreview.net import http_get_json
 
 HOST = "127.0.0.1"
 PORT = 8765
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_TTL = 5
 
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
-EM_UT = "bd1d9ddb04089700cf9c27f6f7426281"
-
+# 快照缓存：{ts, data, lock}
 cache = {"ts": 0.0, "data": None, "lock": threading.Lock()}
 
 
-def http_get_json(url, headers=None, timeout=20, tries=3):
-    h = {"User-Agent": UA, "Accept": "*/*"}
-    if headers:
-        h.update(headers)
-    last = None
-    for i in range(tries):
-        try:
-            req = urllib.request.Request(url, headers=h)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                return json.loads(resp.read().decode("utf-8", errors="replace"))
-        except Exception as exc:
-            last = exc
-            time.sleep(1.0)
-    raise last
-
-
 def fetch_paged(fs, fields, pz=100, fid="f3"):
+    """板块/个股列表分页抓取。"""
     rows = []
     pn = 1
     while True:
@@ -47,7 +39,7 @@ def fetch_paged(fs, fields, pz=100, fid="f3"):
             "pz": pz,
             "po": 1,
             "np": 1,
-            "ut": EM_UT,
+            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
             "fltt": 2,
             "invt": 2,
             "fid": fid,
@@ -67,8 +59,9 @@ def fetch_paged(fs, fields, pz=100, fid="f3"):
 
 
 def fetch_zt_pool(date):
+    """当日涨停池（单页 500 条）。"""
     params = {
-        "ut": "7eea3edcaed734bea9cbfc24409ed989",
+        "ut": EMEX_UT,
         "dpt": "wz.ztzt",
         "Pageindex": 0,
         "pagesize": 500,
@@ -81,8 +74,9 @@ def fetch_zt_pool(date):
 
 
 def fetch_breadth(date):
+    """涨跌家数分布。"""
     params = {
-        "ut": "7eea3edcaed734bea9cbfc24409ed989",
+        "ut": EMEX_UT,
         "dpt": "wz.ztzt",
         "Pageindex": 0,
         "pagesize": 200,
@@ -109,6 +103,7 @@ def fetch_breadth(date):
 
 
 def fetch_index():
+    """主要指数涨跌。"""
     params = {
         "fltt": 2,
         "invt": 2,
@@ -122,6 +117,7 @@ def fetch_index():
 
 
 def fetch_quotes(pool):
+    """批量个股行情。"""
     secids = ",".join(f"{x['m']}.{x['c']}" for x in pool)
     if not secids:
         return {}
@@ -138,6 +134,7 @@ def fetch_quotes(pool):
 
 
 def build_snapshot():
+    """组装盘中监控快照（输出结构与重构前一致）。"""
     errors = []
     today = datetime.now().strftime("%Y%m%d")
     pool = []
