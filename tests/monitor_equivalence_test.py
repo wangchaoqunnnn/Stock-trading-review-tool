@@ -71,11 +71,24 @@ def deep_equal(a, b, path="root"):
     return True, ""
 
 
-def load_module_from_git(path, name, out_name):
+def load_module_from_git(path, name, out_name, marker):
+    """从包含 marker 的最近提交导出文件并导入（用于回溯重构前实现）。"""
+    commits = subprocess.run(
+        ["git", "log", "--format=%H", "--", path], cwd=ROOT,
+        capture_output=True, check=True, text=True,
+    ).stdout.split()
+    orig_commit = None
+    for c in commits:
+        blob = subprocess.run(["git", "show", f"{c}:{path}"], cwd=ROOT, capture_output=True)
+        if marker.encode("utf-8") in blob.stdout:
+            orig_commit = c
+            break
+    if orig_commit is None:
+        raise RuntimeError(f"未找到包含 {marker} 的原始提交")
     out_path = os.path.join(TMP, out_name)
     with open(out_path, "w", encoding="utf-8") as f:
         subprocess.run(
-            ["git", "show", f"HEAD:{path}"], cwd=ROOT,
+            ["git", "show", f"{orig_commit}:{path}"], cwd=ROOT,
             stdout=f, stderr=subprocess.PIPE, check=True,
         )
     spec = importlib.util.spec_from_file_location(name, out_path)
@@ -95,8 +108,8 @@ def patch(mod):
 
 
 def main():
-    print("== 加载原始 intraday_monitor/server.py（git HEAD）==")
-    orig = load_module_from_git("intraday_monitor/server.py", "orig_monitor", "orig_monitor.py")
+    print("== 加载原始 intraday_monitor/server.py（重构前提交）==")
+    orig = load_module_from_git("intraday_monitor/server.py", "orig_monitor", "orig_monitor.py", "def http_get_json")
     print("== 加载重构版 intraday_monitor/server.py ==")
     # 重构版直接从工作区加载（import 时会执行 sys.path 注入并导入 stockreview）
     new_path = os.path.join(MONITOR_DIR, "server.py")

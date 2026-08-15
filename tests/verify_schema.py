@@ -11,13 +11,21 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from compare_schema import schema_map  # noqa: E402
 
-ENDPOINTS = ["snapshot", "realtime", "volprice", "pullback"]
+ENDPOINTS = ["snapshot", "realtime", "volprice", "pullback", "flow3", "trend3"]
 FIXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
 
 
 def fetch(url, timeout=300):
     with urllib.request.urlopen(url, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8", errors="replace"))
+
+
+def _tolerable(only_base, only_new, diff_type):
+    """过滤数据形状导致的假阳性：列表为空（无匹配）或字段可空（null）。"""
+    tolerable_base = {k: v for k, v in only_base.items() if ".[]" not in k}
+    tolerable_new = {k: v for k, v in only_new.items() if ".[]" not in k}
+    tolerable_diff = {k: v for k, v in diff_type.items() if "null" not in v}
+    return tolerable_base, tolerable_new, tolerable_diff
 
 
 def main():
@@ -31,6 +39,7 @@ def main():
         only_base = {k: v for k, v in expected.items() if k not in actual}
         only_new = {k: v for k, v in actual.items() if k not in expected}
         diff_type = {k: (expected[k], actual[k]) for k in expected if k in actual and expected[k] != actual[k]}
+        only_base, only_new, diff_type = _tolerable(only_base, only_new, diff_type)
         if only_base or only_new or diff_type:
             failed = True
             print(f"✗ /api/{name} 结构漂移")

@@ -15,9 +15,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from stockreview.cache import SnapshotCache
 from stockreview.config import DEFAULT_PORT, STATIC_DIR
+from stockreview.flow3 import fetch_flow3_scan
 from stockreview.pullback import fetch_pullback_scan
 from stockreview.realtime import fetch_realtime
 from stockreview.snapshot import fetch_snapshot
+from stockreview.trend3 import fetch_trend3_scan
 from stockreview.volprice import fetch_volume_price_scan
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -27,6 +29,9 @@ CACHE = SnapshotCache(ttl=30, fetcher=fetch_snapshot)
 REALTIME_CACHE = SnapshotCache(ttl=30, fetcher=fetch_realtime)
 VOLPRICE_CACHE = SnapshotCache(ttl=120, fetcher=fetch_volume_price_scan)
 PULLBACK_CACHE = SnapshotCache(ttl=120, fetcher=fetch_pullback_scan)
+# 新增策略扫描较慢，使用更长缓存
+FLOW3_CACHE = SnapshotCache(ttl=600, fetcher=fetch_flow3_scan)
+TREND3_CACHE = SnapshotCache(ttl=600, fetcher=fetch_trend3_scan)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -98,6 +103,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(PULLBACK_CACHE.get())
         elif path == "/api/pullback_refresh":
             self._send_json(PULLBACK_CACHE.get(force=True))
+        elif path == "/api/flow3":
+            self._send_json(FLOW3_CACHE.get())
+        elif path == "/api/flow3_refresh":
+            self._send_json(FLOW3_CACHE.get(force=True))
+        elif path == "/api/trend3":
+            self._send_json(TREND3_CACHE.get())
+        elif path == "/api/trend3_refresh":
+            self._send_json(TREND3_CACHE.get(force=True))
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

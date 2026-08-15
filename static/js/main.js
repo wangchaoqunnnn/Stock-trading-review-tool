@@ -6,6 +6,26 @@ import { load } from "./daily.js";
 import { loadRealtime } from "./realtime.js";
 import { loadVolPrice } from "./volprice.js";
 import { loadPullback } from "./pullback.js";
+import { loadFlow3 } from "./flow3.js";
+import { loadTrend3 } from "./trend3.js";
+
+// Tab -> 页面元素 id / 数据加载函数
+const PAGES = {
+  daily: "page-daily",
+  realtime: "page-realtime",
+  volprice: "page-volprice",
+  pullback: "page-pullback",
+  flow3: "page-flow3",
+  trend3: "page-trend3",
+};
+const LOADERS = {
+  daily: load,
+  realtime: loadRealtime,
+  volprice: loadVolPrice,
+  pullback: loadPullback,
+  flow3: loadFlow3,
+  trend3: loadTrend3,
+};
 
 let activeTab = "daily";
 let timer = null;
@@ -13,13 +33,11 @@ let timer = null;
 function switchTab(name) {
   activeTab = name;
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  $("page-daily").classList.toggle("hidden", name !== "daily");
-  $("page-realtime").classList.toggle("hidden", name !== "realtime");
-  if (name === "realtime") loadRealtime(true);
-  $("page-volprice").classList.toggle("hidden", name !== "volprice");
-  if (name === "volprice") loadVolPrice(true);
-  $("page-pullback").classList.toggle("hidden", name !== "pullback");
-  if (name === "pullback") loadPullback(true);
+  for (const [tab, pageId] of Object.entries(PAGES)) {
+    $(pageId).classList.toggle("hidden", tab !== name);
+  }
+  // 切到非每日复盘页时立即强制刷新（保持历史行为）
+  if (name !== "daily") LOADERS[name](true);
 }
 
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
@@ -27,18 +45,12 @@ document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () 
 function startAuto() {
   if (timer) clearInterval(timer);
   timer = setInterval(() => {
-    if (activeTab === "realtime") loadRealtime(false);
-    else if (activeTab === "volprice") loadVolPrice(false);
-    else if (activeTab === "pullback") loadPullback(false);
-    else load(false);
+    (LOADERS[activeTab] || load)(false);
   }, 30000);
 }
 
 $("refreshBtn").addEventListener("click", () => {
-  if (activeTab === "realtime") loadRealtime(true);
-  else if (activeTab === "volprice") loadVolPrice(true);
-  else if (activeTab === "pullback") loadPullback(true);
-  else load(true);
+  (LOADERS[activeTab] || load)(true);
 });
 $("autoBtn").addEventListener("click", () => {
   const next = toggleAuto();

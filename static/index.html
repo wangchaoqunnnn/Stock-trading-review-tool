@@ -24,6 +24,8 @@
     <button class="tab" data-tab="realtime" type="button">实时盘口</button>
     <button class="tab" data-tab="volprice" type="button">量价异动</button>
     <button class="tab" data-tab="pullback" type="button">涨停回踩</button>
+    <button class="tab" data-tab="flow3" type="button">3日资金</button>
+    <button class="tab" data-tab="trend3" type="button">放量阳线</button>
   </nav>
 
   <main>
@@ -131,6 +133,42 @@
         <h2>涨停回踩池 <span class="sub">20日内涨停 + 上升趋势 + 缩量回踩不破 + 市场热点</span></h2>
         <div id="pbSummary"></div>
         <div id="pbList"></div>
+      </section>
+    </section>
+
+    <section id="page-flow3" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="f3State" class="rt-state">加载中...</span></h2>
+        <div id="f3Market"></div>
+        <div id="f3Summary"></div>
+      </section>
+      <section class="panel">
+        <h2>连续3日+ 主力净流入板块 <span class="sub">主力资金历史连续净流入 ≥3 日，按连续天数与累计净流入排序</span></h2>
+        <div id="f3InflowBoards"></div>
+      </section>
+      <section class="panel">
+        <h2>连续3日+ 主力净流出板块 <span class="sub">主力资金历史连续净流出 ≥3 日</span></h2>
+        <div id="f3OutflowBoards"></div>
+      </section>
+      <section class="panel">
+        <h2>连续3日+ 主力净流入个股 <span class="sub">全A按当日主力净流入预筛后核对资金流历史</span></h2>
+        <div id="f3InflowStocks"></div>
+      </section>
+    </section>
+
+    <section id="page-trend3" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="t3State" class="rt-state">加载中...</span></h2>
+        <div id="t3Market"></div>
+        <div id="t3Summary"></div>
+      </section>
+      <section class="panel">
+        <h2>连续3日+ 小幅放量阳线个股 <span class="sub">阳线(收>开) + 温和放量(量较前日+5%~150%) ≥3日，且站上MA20、MA20走高</span></h2>
+        <div id="t3Stocks"></div>
+      </section>
+      <section class="panel">
+        <h2>连续3日+ 小幅放量阳线板块</h2>
+        <div id="t3Boards"></div>
       </section>
     </section>
 

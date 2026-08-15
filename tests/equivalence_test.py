@@ -221,13 +221,30 @@ def assert_equal(name, a, b):
 
 # ---------- 加载原始实现 ----------
 
+def _find_original_commit(marker, path):
+    """查找 server.py 仍为单文件实现（含 marker 函数）的最近提交。
+
+    重构提交之后 HEAD 已是拆分版，因此需要回溯到重构前的提交。
+    """
+    commits = subprocess.run(
+        ["git", "log", "--format=%H", "--", path], cwd=ROOT,
+        capture_output=True, check=True, text=True,
+    ).stdout.split()
+    for c in commits:
+        blob = subprocess.run(["git", "show", f"{c}:{path}"], cwd=ROOT, capture_output=True)
+        if marker.encode("utf-8") in blob.stdout:
+            return c
+    raise RuntimeError(f"未找到包含 {marker} 的原始提交")
+
+
 def load_original():
-    """从 git HEAD 导出原始 server.py 到工作区临时目录并导入。"""
+    """从重构前提交导出原始 server.py 到工作区临时目录并导入。"""
     os.makedirs(TMP, exist_ok=True)
+    orig_commit = _find_original_commit("def time_phase", "server.py")
     orig_path = os.path.join(TMP, "orig_server.py")
     with open(orig_path, "w", encoding="utf-8") as f:
         subprocess.run(
-            ["git", "show", "HEAD:server.py"], cwd=ROOT,
+            ["git", "show", f"{orig_commit}:server.py"], cwd=ROOT,
             stdout=f, stderr=subprocess.PIPE, check=True,
         )
     spec = importlib.util.spec_from_file_location("orig_server", orig_path)

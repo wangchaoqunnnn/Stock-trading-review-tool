@@ -253,3 +253,97 @@ def evaluate_pullback(c, hist, hot_set, board_flow_map):
         "limit_date": limit_bar["date"], "limit_pct": round(limit_bar.get("pct") or 0, 2),
         "days_since": days_since, "hot": hot, "score": score, "tags": tags,
     }
+
+
+# ---------- 连续资金净流入/流出 ----------
+
+MIN_STREAK_DAYS = 3
+
+
+def parse_fflow_rows(lines):
+    """解析东方财富主力资金流历史（daykline）行。
+
+    每行: 日期,主力净流入,小单,中单,大单,超大单,主力占比%,小单占比,中单占比,
+    大单占比,超大单占比,收盘价,涨跌幅,0,0
+    """
+    out = []
+    for line in lines:
+        p = line.split(",")
+        if len(p) < 13:
+            continue
+        out.append({
+            "date": p[0],
+            "main_flow": to_num(p[1]),
+            "main_pct": to_num(p[6]),
+            "close": to_num(p[11]),
+            "pct": to_num(p[12]),
+        })
+    return out
+
+
+def trailing_days(rows, predicate):
+    """从最新一天往前数，连续满足 predicate 的天数。"""
+    n = 0
+    for r in reversed(rows):
+        if predicate(r):
+            n += 1
+        else:
+            break
+    return n
+
+
+def trailing_inflow_days(rows):
+    """主力资金连续净流入天数（含当日）。"""
+    return trailing_days(rows, lambda r: r["main_flow"] > 0)
+
+
+def trailing_outflow_days(rows):
+    """主力资金连续净流出天数（含当日）。"""
+    return trailing_days(rows, lambda r: r["main_flow"] < 0)
+
+
+def streak_flow_sum(rows, n):
+    """最近 n 天（含当日）主力资金净流入合计，单位元。"""
+    return sum(r["main_flow"] for r in rows[-n:])
+
+
+# ---------- 连续小幅放量阳线 + 上升趋势 ----------
+
+# 温和放量：成交量较前一日放大 5%~150%
+YANG_VOL_MIN = 1.05
+YANG_VOL_MAX = 2.5
+
+
+def yang_streak(hist):
+    """从最新一天往前数，连续"阳线 + 温和放量"的天数。"""
+    n = 0
+    for i in range(len(hist) - 1, 0, -1):
+        cur = hist[i]
+        prev = hist[i - 1]
+        if cur["close"] > cur["open"] and prev["volume"] > 0:
+            ratio = cur["volume"] / prev["volume"]
+            if YANG_VOL_MIN <= ratio <= YANG_VOL_MAX:
+                n += 1
+            else:
+                break
+        else:
+            break
+    return n
+
+
+def is_uptrend(hist):
+    """上升趋势：收盘站上 MA20 且 MA20 走高。"""
+    if len(hist) < 25:
+        return False
+    closes = [h["close"] for h in hist]
+    ma20 = sum(closes[-20:]) / 20
+    ma20_prev = sum(closes[-25:-5]) / 20
+    return closes[-1] > ma20 and ma20 > ma20_prev
+
+
+def pct_5d(hist):
+    """近 5 个交易日累计涨幅（%）。"""
+    if len(hist) < 6:
+        return None
+    base = hist[-6]["close"]
+    return round((hist[-1]["close"] / base - 1) * 100, 2) if base else None

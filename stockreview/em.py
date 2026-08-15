@@ -386,3 +386,74 @@ def fetch_kline_hist(code, limit=45):
         return out
     except Exception:
         return []
+
+
+def fetch_fflow_daykline(secid, limit=0):
+    """主力资金流历史（日线）。push2his 优先，push2delay 兜底（仅当日）。"""
+    params = {
+        "lmt": limit, "klt": 101, "secid": secid,
+        "fields1": "f1,f2,f3,f7",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
+    }
+    for host in _history_hosts():
+        try:
+            url = f"https://{host}/api/qt/stock/fflow/daykline/get?" + urllib.parse.urlencode(params)
+            data = http_get_json(url, headers={"Referer": "https://data.eastmoney.com/zjlx/detail.html"})
+            rows = (data.get("data") or {}).get("klines") or []
+            if rows:
+                _note_history_ok()
+                return rows
+        except Exception:
+            _note_history_fail()
+            continue
+    return []
+
+
+def fetch_board_kline(code, limit=45):
+    """板块日K线（东财 kline 接口，secid=90.BKxxxx）。"""
+    params = {
+        "secid": "90." + code,
+        "fields1": "f1,f2,f3,f4,f5,f6",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+        "klt": 101, "fqt": 1, "end": "20500101", "lmt": limit,
+    }
+    for host in _history_hosts():
+        try:
+            url = f"https://{host}/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
+            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"})
+            out = []
+            for line in (data.get("data") or {}).get("klines") or []:
+                p = line.split(",")
+                if len(p) < 11:
+                    continue
+                out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
+            if out:
+                _note_history_ok()
+                return out
+        except Exception:
+            _note_history_fail()
+            continue
+    return []
+
+
+# ---------- 历史接口熔断（push2his 连续失败时短暂跳过，避免扫描被重试拖垮） ----------
+
+_HISTORY_STATE = {"fails": 0, "skip_push2his_until": 0.0}
+
+
+def _history_hosts():
+    """返回待尝试的历史接口 host 列表（熔断生效时跳过 push2his）。"""
+    if time.time() < _HISTORY_STATE["skip_push2his_until"]:
+        return ("push2delay.eastmoney.com",)
+    return ("push2his.eastmoney.com", "push2delay.eastmoney.com")
+
+
+def _note_history_fail():
+    _HISTORY_STATE["fails"] += 1
+    if _HISTORY_STATE["fails"] >= 8:
+        _HISTORY_STATE["skip_push2his_until"] = time.time() + 300  # 5 分钟内跳过
+        _HISTORY_STATE["fails"] = 0
+
+
+def _note_history_ok():
+    _HISTORY_STATE["fails"] = 0
