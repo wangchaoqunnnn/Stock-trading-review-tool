@@ -98,9 +98,9 @@ def fetch_market_amount():
         return None
 
 
-def fetch_breadth():
-    """涨跌家数分布。"""
-    date = datetime.now().strftime("%Y%m%d")
+def fetch_breadth(date=None):
+    """涨跌家数分布（date 可选，默认当日，YYYYMMDD）。"""
+    date = date or datetime.now().strftime("%Y%m%d")
     url = f"https://push2ex.eastmoney.com/getTopicZDFenBu?ut={EMEX_UT}&dpt=wz.ztzt&Pageindex=0&pagesize=100&sort=fbt%3Aasc&date={date}"
     data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})
     fenbu = data.get("data", {}).get("fenbu") or []

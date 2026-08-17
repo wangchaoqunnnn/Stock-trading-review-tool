@@ -1,0 +1,20 @@
+{
+ "root": "dict",
+ "root.as_of": "str",
+ "root.days": "num",
+ "root.rows": "list",
+ "root.rows.[].keys": "date,dt,jingjia,level,max_lb,score,up_ratio,zb,zhaban_rate,zt",
+ "root.rows.[].kinds": "dict",
+ "root.rows.[]": "dict",
+ "root.rows.[].date": "str",
+ "root.rows.[].zt": "num",
+ "root.rows.[].zb": "num",
+ "root.rows.[].dt": "num",
+ "root.rows.[].max_lb": "num",
+ "root.rows.[].jingjia": "num",
+ "root.rows.[].zhaban_rate": "num",
+ "root.rows.[].up_ratio": "num",
+ "root.rows.[].score": "num",
+ "root.rows.[].level": "str",
+ "root.errors": "list"
+}

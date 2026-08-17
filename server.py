@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from stockreview.cache import SnapshotCache
 from stockreview.breakout import fetch_breakout_scan
 from stockreview.config import DEFAULT_PORT, STATIC_DIR
+from stockreview.emotion_history import fetch_emotion_history
 from stockreview.flow3 import fetch_flow3_scan
 from stockreview.heatmap import fetch_heatmap_scan
 from stockreview.hot import fetch_hot_scan
@@ -49,6 +50,8 @@ BREAKOUT_CACHE = SnapshotCache(ttl=600, fetcher=fetch_breakout_scan)
 # 龙头股 / 热力图：盘中口径，60s 缓存
 LEADERS_CACHE = SnapshotCache(ttl=60, fetcher=fetch_leaders_scan)
 HEATMAP_CACHE = SnapshotCache(ttl=60, fetcher=fetch_heatmap_scan)
+# 情绪周期表：多日历史数据，10 分钟缓存
+EMOTION_HISTORY_CACHE = SnapshotCache(ttl=600, fetcher=fetch_emotion_history)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -163,6 +166,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(HEATMAP_CACHE.get())
         elif path == "/api/heatmap_refresh":
             self._send_json(HEATMAP_CACHE.get(force=True))
+        elif path == "/api/emotion_history":
+            self._send_json(EMOTION_HISTORY_CACHE.get())
+        elif path == "/api/emotion_history_refresh":
+            self._send_json(EMOTION_HISTORY_CACHE.get(force=True))
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

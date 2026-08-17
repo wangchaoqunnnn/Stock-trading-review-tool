@@ -475,11 +475,34 @@ def main():
           "热力图：3个板块按涨跌幅降序（半导体第一）")
     check(hm["boards"][-1]["name"] == "银行" and hm["boards"][-1]["pct"] == -1.5, "银行垫底（-1.5%）")
 
+    print("== emotion_history 离线扫描 ==")
+    from stockreview.emotion_history import emotion_score, emotion_level
+
+    def fake_ex(date):
+        if date == "20260813":
+            return {"tc": 30, "pool": [{"c": "600001", "fbt": 93000, "lbc": 3}]}
+        return {"tc": 60, "pool": [{"c": "600001", "fbt": 93000, "lbc": 5}, {"c": "600002", "fbt": 92500, "lbc": 4}]}
+    em.fetch_ex_pool = lambda path, date=None: fake_ex(date)
+    em.fetch_breadth = lambda date=None: {"up": 3000, "down": 1000, "flat": 200}
+    import stockreview.emotion_history as eh_mod
+    eh_mod._recent_trading_dates = lambda days=15, max_calendar=45: ["20260813", "20260814", "20260815"]
+    eh_mod.datetime = FakeDT
+    eh = eh_mod.fetch_emotion_history(days=15)
+    rows = {r["date"]: r for r in eh["rows"]}
+    check(eh["days"] == 3, "3 个交易日")
+    check(rows["2026-08-15"]["zt"] == 60 and rows["2026-08-15"]["max_lb"] == 5 and rows["2026-08-15"]["jingjia"] == 1,
+          "当日：涨停60/最高5板/竞价1家")
+    check(rows["2026-08-13"]["zt"] == 30, "前日：涨停30")
+    s = emotion_score({"tc": 60, "pool": []}, {"tc": 15, "pool": []}, {"tc": 5, "pool": []}, {"up": 3000, "down": 1000})
+    check(0 <= s["score"] <= 100, f"情绪分在0-100（{s['score']}）")
+    check(emotion_level(80) == "亢奋" and emotion_level(50) == "中性" and emotion_level(10) == "冰点",
+          "情绪等级划分正确")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

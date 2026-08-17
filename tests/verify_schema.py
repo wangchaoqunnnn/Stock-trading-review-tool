@@ -11,7 +11,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from compare_schema import schema_map  # noqa: E402
 
-ENDPOINTS = ["snapshot", "realtime", "volprice", "pullback", "flow3", "trend3", "limit20", "ztpool", "hot", "breakout", "leaders", "heatmap"]
+ENDPOINTS = ["snapshot", "realtime", "volprice", "pullback", "flow3", "trend3", "limit20", "ztpool", "hot", "breakout", "leaders", "heatmap", "emotion_history"]
 FIXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
 
 
