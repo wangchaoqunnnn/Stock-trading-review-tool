@@ -311,26 +311,16 @@ tr:last-child td { border-bottom: none; }
   font-weight: 400;
 }
 
-.sort-box {
-  float: right;
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 400;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: -2px;
-}
-
-.sort-box select {
-  appearance: none;
-  background: #1a2130;
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 12px;
+th.sortable {
   cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
 }
 
-.sort-box select:hover { border-color: var(--accent); }
+th.sortable:hover {
+  color: var(--accent);
+}
+
+th.sortable.active {
+  color: var(--accent);
+}
