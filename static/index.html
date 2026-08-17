@@ -30,6 +30,8 @@
     <button class="tab" data-tab="ztpool" type="button">今日涨停</button>
     <button class="tab" data-tab="hot" type="button">市场热度</button>
     <button class="tab" data-tab="breakout" type="button">突破新高</button>
+    <button class="tab" data-tab="leaders" type="button">龙头股</button>
+    <button class="tab" data-tab="heatmap" type="button">热力图</button>
   </nav>
 
   <main>
@@ -251,6 +253,41 @@
       <section class="panel">
         <h2>突破历史高点 <span id="boHistWindow" class="sub"></span></h2>
         <div id="boHist"></div>
+      </section>
+    </section>
+
+    <section id="page-leaders" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="ldState" class="rt-state">加载中...</span></h2>
+        <div id="ldMarket"></div>
+      </section>
+      <section class="panel">
+        <h2>市场总龙 <span id="ldMaxState" class="sub"></span></h2>
+        <div id="ldMarketLeader"></div>
+      </section>
+      <section class="panel">
+        <h2>板块龙头 <span class="sub">按板块涨停家数与个股强度</span></h2>
+        <div id="ldBoardLeader"></div>
+      </section>
+      <section class="panel">
+        <h2>情绪龙头 <span class="sub">连板梯队前排 + 人气榜标注</span></h2>
+        <div id="ldEmotionLeader"></div>
+      </section>
+    </section>
+
+    <section id="page-heatmap" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="hmState" class="rt-state">加载中...</span></h2>
+        <div id="hmMarket"></div>
+        <div id="hmSummary"></div>
+      </section>
+      <section class="panel">
+        <h2>行业板块热力图 <span class="sub">红涨绿跌，颜色深浅=涨跌幅大小；点击切换排序</span></h2>
+        <div class="heat-toolbar">
+          <button type="button" class="heat-sort active" data-sort="pct">按涨跌幅</button>
+          <button type="button" class="heat-sort" data-sort="flow">按主力资金</button>
+        </div>
+        <div id="hmBoards" class="heat-grid"></div>
       </section>
     </section>
 

@@ -436,11 +436,50 @@ def main():
           "突破幅度/量比字段正确")
     check(bo["short"]["count"] == 2 and bo["hist"]["count"] == 1, "计数正确")
 
+    print("== leaders 离线扫描 ==")
+    em.fetch_zt_pool = lambda: {"tc": 3, "pool": [
+        {"c": "600001", "n": "甲科技", "hybk": "半导体", "fbt": 93000, "lbc": 4, "zbc": 0, "fund": 3.0e8, "zdp": 10.0, "amount": 2.0e8, "hs": 10.0},
+        {"c": "600002", "n": "乙软件", "hybk": "半导体", "fbt": 94000, "lbc": 2, "zbc": 0, "fund": 2.0e8, "zdp": 10.0, "amount": 1.5e8, "hs": 8.0},
+        {"c": "600003", "n": "丙能源", "hybk": "新能源", "fbt": 95000, "lbc": 4, "zbc": 0, "fund": 1.0e8, "zdp": 19.9, "amount": 1.0e8, "hs": 15.0},
+        {"c": "600004", "n": "丁材料", "hybk": "有色", "fbt": 101000, "lbc": 0, "zbc": 0, "fund": 5.0e7, "zdp": 5.0, "amount": 8.0e7, "hs": 6.0},
+    ]}
+    em.fetch_hot_rank_list = None  # 由 hot 模块提供，见下
+    import stockreview.leaders as leaders_mod
+    leaders_mod.fetch_hot_rank_list = hot_mod.fetch_hot_rank_list  # 走真实规范化逻辑（http_get_json 已打桩）
+    leaders_mod.datetime = FakeDT
+    ld = leaders_mod.fetch_leaders_scan()
+    mkt = {x["name"]: x for x in ld["market_leader"]["stocks"]}
+    bd = {x["industry"]: x for x in ld["board_leader"]["stocks"]}
+    emo = {x["name"]: x for x in ld["emotion_leader"]["stocks"]}
+    check(ld["max_lb"] == 4, "最高4板")
+    check(set(mkt.keys()) == {"甲科技", "丙能源"} and mkt["甲科技"]["fund_yi"] == 3.0,
+          "市场总龙=最高4板两只，按封单降序（甲在前）")
+    check(bd.get("半导体", {}).get("name") == "甲科技" and bd["半导体"]["zt_count"] == 2,
+          "板块龙头：半导体=甲科技（4板）")
+    check(bd.get("新能源", {}).get("name") == "丙能源" and bd.get("有色", {}).get("name") == "丁材料",
+          "板块龙头：新能源=丙能源、有色=丁材料")
+    check(emo.get("甲科技", {}).get("hot_rank") == 1 and "乙软件" in emo,
+          "情绪龙头：连板梯队（甲/乙/丙）且甲人气第1")
+    check("丁材料" not in emo, "首板丁材料不进情绪龙头")
+
+    print("== heatmap 离线扫描 ==")
+    em.fetch_industry_boards = lambda: em.board_rows([
+        {"f12": "BK01", "f14": "半导体", "f3": 3.2, "f6": 1.0e10, "f8": 2.0, "f10": 1.8, "f17": 101.0, "f18": 100.0, "f62": 8.0e8, "f184": 0.5, "f104": 3, "f105": 1, "f128": "甲科技", "f141": 10.0, "f140": "600001"},
+        {"f12": "BK02", "f14": "银行", "f3": -1.5, "f6": 5.0e9, "f8": 0.5, "f10": 0.8, "f17": 98.5, "f18": 100.0, "f62": -2.0e8, "f184": 0.1, "f104": 0, "f105": 2, "f128": "银行股", "f141": 0.5, "f140": "601398"},
+        {"f12": "BK03", "f14": "电力", "f3": 1.0, "f6": 3.0e9, "f8": 1.0, "f10": 1.1, "f17": 101.0, "f18": 100.0, "f62": 1.0e8, "f184": 0.2, "f104": 1, "f105": 0, "f128": "电力股", "f141": 2.0, "f140": "600011"},
+    ])
+    import stockreview.heatmap as heatmap_mod
+    heatmap_mod.datetime = FakeDT
+    hm = heatmap_mod.fetch_heatmap_scan()
+    check(hm["total"] == 3 and hm["boards"][0]["name"] == "半导体" and hm["boards"][0]["pct"] == 3.2,
+          "热力图：3个板块按涨跌幅降序（半导体第一）")
+    check(hm["boards"][-1]["name"] == "银行" and hm["boards"][-1]["pct"] == -1.5, "银行垫底（-1.5%）")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

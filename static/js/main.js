@@ -12,6 +12,8 @@ import { loadLimit20 } from "./limit20.js";
 import { loadZtpool } from "./ztpool.js";
 import { loadHot } from "./hot.js";
 import { loadBreakout } from "./breakout.js";
+import { loadLeaders } from "./leaders.js";
+import { loadHeatmap } from "./heatmap.js";
 
 // Tab -> 页面元素 id / 数据加载函数
 const PAGES = {
@@ -25,6 +27,8 @@ const PAGES = {
   ztpool: "page-ztpool",
   hot: "page-hot",
   breakout: "page-breakout",
+  leaders: "page-leaders",
+  heatmap: "page-heatmap",
 };
 const LOADERS = {
   daily: load,
@@ -37,6 +41,8 @@ const LOADERS = {
   ztpool: loadZtpool,
   hot: loadHot,
   breakout: loadBreakout,
+  leaders: loadLeaders,
+  heatmap: loadHeatmap,
 };
 
 const REFRESH_INTERVAL = 30; // 自动刷新周期（秒）
