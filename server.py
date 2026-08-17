@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from stockreview.cache import SnapshotCache
 from stockreview.config import DEFAULT_PORT, STATIC_DIR
 from stockreview.flow3 import fetch_flow3_scan
+from stockreview.hot import fetch_hot_scan
 from stockreview.limit20 import fetch_limit20_scan
 from stockreview.pullback import fetch_pullback_scan
 from stockreview.realtime import fetch_realtime
@@ -38,6 +39,8 @@ TREND3_CACHE = SnapshotCache(ttl=600, fetcher=fetch_trend3_scan)
 LIMIT20_CACHE = SnapshotCache(ttl=600, fetcher=fetch_limit20_scan)
 # 今日涨停面板：盘中实时口径，30s 缓存
 ZTPOOL_CACHE = SnapshotCache(ttl=30, fetcher=fetch_ztpool_detail)
+# 市场热度：同花顺热股榜日榜，5 分钟缓存
+HOT_CACHE = SnapshotCache(ttl=300, fetcher=fetch_hot_scan)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -136,6 +139,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(ZTPOOL_CACHE.get())
         elif path == "/api/ztpool_refresh":
             self._send_json(ZTPOOL_CACHE.get(force=True))
+        elif path == "/api/hot":
+            self._send_json(HOT_CACHE.get())
+        elif path == "/api/hot_refresh":
+            self._send_json(HOT_CACHE.get(force=True))
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

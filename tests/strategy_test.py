@@ -215,6 +215,18 @@ FAKE_POOL_DT = {"tc": 1, "pool": [
 ]}
 FAKE_SPOT_MAP = {c: {"f5": 1_000_000.0, "f10": 2.5, "f8": 12.0} for c in ("600001", "600002", "300004", "000005", "601398")}
 
+# hot 用：同花顺热股榜假数据（order 排名 / hot_rank_chg 排名变化）
+FAKE_HOT_LIST = [
+    {"market": 33, "code": "600001", "name": "甲科技", "order": 1, "rate": "1000000", "hot_rank_chg": "0", "rise_and_fall": 5.0,
+     "tag": {"concept_tag": ["半导体", "芯片"], "popularity_tag": "首板涨停"}, "analyse_title": "半导体板块活跃"},
+    {"market": 33, "code": "600002", "name": "乙软件", "order": 2, "rate": "900000", "hot_rank_chg": "3", "rise_and_fall": 2.0,
+     "tag": {"concept_tag": ["软件"]}, "analyse_title": ""},
+    {"market": 33, "code": "600003", "name": "丙数据", "order": 3, "rate": "800000", "hot_rank_chg": "28", "rise_and_fall": -1.0,
+     "tag": {"concept_tag": ["算力"]}, "analyse_title": "算力概念"},
+    {"market": 33, "code": "600004", "name": "丁材料", "order": 4, "rate": "700000", "hot_rank_chg": "-5", "rise_and_fall": 3.5,
+     "tag": {}, "analyse_title": ""},
+]
+
 
 def patch_fetchers():
     em.fetch_industry_boards = lambda: [dict(x) for x in FAKE_BOARDS]
@@ -339,11 +351,25 @@ def main():
     check(r["vol_wan"] == 100 and r["vol_ratio"] == 2.5 and r["amount_yi"] == 2.0 and r["industry"] == "半导体",
           "行字段：量100万手/量比2.5/成交2.0亿/板块半导体")
 
+    print("== hot 离线扫描 ==")
+    net.http_get_json = lambda url, headers=None, tries=3: {"data": {"stock_list": [dict(x) for x in FAKE_HOT_LIST]}}
+    import stockreview.hot as hot_mod
+    hot_mod.datetime = FakeDT
+    hot = hot_mod.fetch_hot_scan()
+    top = {x["name"]: x for x in hot["top"]["stocks"]}
+    rising = {x["name"]: x for x in hot["rising"]["stocks"]}
+    check(len(hot["top"]["stocks"]) == 4 and top["甲科技"]["rank"] == 1, "热度TOP 按排名升序（甲科技第1）")
+    check(len(hot["rising"]["stocks"]) == 4 and hot["rising"]["stocks"][0]["name"] == "丙数据",
+          "热度上升最快 按排名变化降序（丙数据+28居首）")
+    check(rising["乙软件"]["rank_chg"] == 3 and rising["乙软件"]["pct"] == 2.0, "行字段：排名变化/涨跌幅")
+    check(top["甲科技"]["tags"] == ["半导体", "芯片"] and top["甲科技"]["popularity_tag"] == "首板涨停",
+          "概念标签与状态解析正确")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

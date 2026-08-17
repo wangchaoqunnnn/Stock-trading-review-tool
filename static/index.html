@@ -28,6 +28,7 @@
     <button class="tab" data-tab="trend3" type="button">放量阳线</button>
     <button class="tab" data-tab="limit20" type="button">涨停横盘</button>
     <button class="tab" data-tab="ztpool" type="button">今日涨停</button>
+    <button class="tab" data-tab="hot" type="button">市场热度</button>
   </nav>
 
   <main>
@@ -213,6 +214,22 @@
       <section class="panel">
         <h2>竞价涨停（09:25 前封板） <span id="zpJjCount" class="sub"></span></h2>
         <div id="zpJj"></div>
+      </section>
+    </section>
+
+    <section id="page-hot" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="hotState" class="rt-state">加载中...</span></h2>
+        <div id="hotMarket"></div>
+        <div id="hotSource" class="subtitle"></div>
+      </section>
+      <section class="panel">
+        <h2>市场热度排名 TOP50 <span class="sub">同花顺热股榜（A股日榜）按热度排名</span></h2>
+        <div id="hotTop"></div>
+      </section>
+      <section class="panel">
+        <h2>热度上升最快 TOP50 <span class="sub">按热度排名上升幅度（hot_rank_chg）排序</span></h2>
+        <div id="hotRising"></div>
       </section>
     </section>
 
