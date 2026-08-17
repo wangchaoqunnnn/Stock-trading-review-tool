@@ -1,7 +1,6 @@
 /* ---------- 每日复盘 ---------- */
 
 import { $, esc, fmt, pctClass, signed, toYi } from "./utils.js";
-import { auto } from "./state.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const BOARD_HEADERS = [
@@ -211,16 +210,13 @@ function render(d) {
 }
 
 export async function load(force = false) {
-  $("refreshState").textContent = "更新中...";
   try {
     const url = force ? "/api/refresh" : "/api/snapshot";
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();
     render(d);
-    $("refreshState").textContent = auto ? "自动刷新 30s" : "已暂停自动刷新";
   } catch (e) {
     $("errors").textContent = "刷新失败：" + e.message;
-    $("refreshState").textContent = "刷新失败";
   }
 }

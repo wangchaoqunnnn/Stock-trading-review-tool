@@ -1,7 +1,7 @@
-/* ---------- 应用入口：Tab 切换、自动刷新、按钮事件 ---------- */
+/* ---------- 应用入口：Tab 切换、自动刷新（带倒计时）、按钮事件 ---------- */
 
 import { $ } from "./utils.js";
-import { toggleAuto } from "./state.js";
+import { auto, toggleAuto } from "./state.js";
 import { load } from "./daily.js";
 import { loadRealtime } from "./realtime.js";
 import { loadVolPrice } from "./volprice.js";
@@ -33,8 +33,12 @@ const LOADERS = {
   ztpool: loadZtpool,
 };
 
+const REFRESH_INTERVAL = 30; // 自动刷新周期（秒）
+
 let activeTab = "daily";
 let timer = null;
+let countdown = REFRESH_INTERVAL;
+let refreshing = false;
 
 function switchTab(name) {
   activeTab = name;
@@ -48,21 +52,52 @@ function switchTab(name) {
 
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
 
-function startAuto() {
-  if (timer) clearInterval(timer);
-  timer = setInterval(() => {
-    (LOADERS[activeTab] || load)(false);
-  }, 30000);
+// 顶部刷新状态：倒计时显示（由本模块统一管理）
+function updateCountdown() {
+  $("refreshState").textContent = auto ? `自动刷新 ${countdown}s` : "已暂停自动刷新";
 }
 
-$("refreshBtn").addEventListener("click", () => {
-  (LOADERS[activeTab] || load)(true);
-});
+// 统一刷新入口：手动/自动/初始化都走这里
+async function refreshNow(force = false) {
+  if (refreshing && !force) return; // 上一轮未完成时跳过自动刷新
+  refreshing = true;
+  $("refreshState").textContent = "更新中...";
+  try {
+    await (LOADERS[activeTab] || load)(force);
+  } finally {
+    refreshing = false;
+    if (auto) countdown = REFRESH_INTERVAL;
+    updateCountdown();
+  }
+}
+
+// 每秒 tick：更新倒计时，归零时触发自动刷新
+function tick() {
+  if (!auto) {
+    updateCountdown();
+    return;
+  }
+  countdown -= 1;
+  if (countdown <= 0) {
+    countdown = REFRESH_INTERVAL;
+    refreshNow(false);
+  }
+  updateCountdown();
+}
+
+function startAuto() {
+  if (timer) clearInterval(timer);
+  timer = setInterval(tick, 1000);
+  updateCountdown();
+}
+
+$("refreshBtn").addEventListener("click", () => refreshNow(true));
 $("autoBtn").addEventListener("click", () => {
   const next = toggleAuto();
   $("autoBtn").classList.toggle("active", next);
-  $("refreshState").textContent = next ? "自动刷新 30s" : "已暂停自动刷新";
+  if (next) countdown = REFRESH_INTERVAL;
+  updateCountdown();
 });
 
 startAuto();
-load(true);
+refreshNow(true);
