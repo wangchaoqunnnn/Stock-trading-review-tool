@@ -400,16 +400,24 @@ def fetch_kline_hist(code, limit=45, end_date=None):
 
 
 def _parse_kline_list(rows):
-    """把 K 线列表行（[date,open,close,high,low,volume,...]）转为字典行。"""
+    """把 K 线行转为字典行，兼容 list（腾讯/东财）与 dict（新浪）两种格式。"""
     out = []
     for row in rows:
         try:
-            out.append({
-                "date": row[0],
-                "open": to_num(row[1]), "close": to_num(row[2]),
-                "high": to_num(row[3]), "low": to_num(row[4]),
-                "volume": to_num(row[5]),
-            })
+            if isinstance(row, list):
+                out.append({
+                    "date": row[0],
+                    "open": to_num(row[1]), "close": to_num(row[2]),
+                    "high": to_num(row[3]), "low": to_num(row[4]),
+                    "volume": to_num(row[5]),
+                })
+            else:
+                out.append({
+                    "date": row.get("day"),
+                    "open": to_num(row.get("open")), "close": to_num(row.get("close")),
+                    "high": to_num(row.get("high")), "low": to_num(row.get("low")),
+                    "volume": to_num(row.get("volume")),
+                })
         except Exception:
             continue
     return out
