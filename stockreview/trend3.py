@@ -12,6 +12,7 @@ from datetime import datetime
 from . import em, net
 from .analysis import is_uptrend, pct_5d, yang_streak
 from .config import ALL_A_FS
+from .market import fetch_market_context
 from .utils import to_num
 
 # 全A扫描行情字段
@@ -32,36 +33,6 @@ def _safe(name, fn):
         return name, fn()
     except Exception as exc:
         return name, {"error": f"{type(exc).__name__}: {exc}"}
-
-
-def _market_context():
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {
-            "indices": ex.submit(_safe, "indices", em.fetch_indices),
-            "breadth": ex.submit(_safe, "breadth", em.fetch_breadth),
-            "zt": ex.submit(_safe, "zt", em.fetch_zt_pool),
-            "zb": ex.submit(_safe, "zb", em.fetch_zb_pool),
-            "dt": ex.submit(_safe, "dt", em.fetch_dt_pool),
-            "amount": ex.submit(_safe, "amount", em.fetch_market_amount),
-        }
-        results = {k: f.result() for k, f in futures.items()}
-
-    def val(k, default):
-        return results[k][1] if not isinstance(results[k], dict) else default
-
-    from .analysis import compute_emotion
-    zt = val("zt", {"tc": 0, "pool": []})
-    zb = val("zb", {"tc": 0, "pool": []})
-    dt = val("dt", {"tc": 0, "pool": []})
-    emotion = compute_emotion(zt, zb, dt)
-    errors = [str(v.get("error")) for v in results.values() if isinstance(v, dict) and "error" in v]
-    return {
-        "indices": val("indices", []),
-        "breadth": val("breadth", {"up": 0, "down": 0, "flat": 0}),
-        "emotion": emotion,
-        "amount_yi": val("amount", None),
-        "errors": errors,
-    }
 
 
 def _check_stock(row):
@@ -122,7 +93,7 @@ def fetch_trend3_scan():
             "stocks": ex.submit(_safe, "stocks", lambda: net.fetch_paged(ALL_A_FS, SCAN_FIELDS, limit=6000)),
         }
         results = {k: f.result() for k, f in futures.items()}
-        context = ex.submit(_market_context).result()
+        context = ex.submit(fetch_market_context).result()
 
     errors = list(context["errors"])
     industry = results["industry"][1] if not isinstance(results["industry"], dict) else []

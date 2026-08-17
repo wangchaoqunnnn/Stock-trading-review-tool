@@ -11,7 +11,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from compare_schema import schema_map  # noqa: E402
 
-ENDPOINTS = ["snapshot", "realtime", "volprice", "pullback", "flow3", "trend3"]
+ENDPOINTS = ["snapshot", "realtime", "volprice", "pullback", "flow3", "trend3", "limit20"]
 FIXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
 
 
@@ -21,10 +21,10 @@ def fetch(url, timeout=300):
 
 
 def _tolerable(only_base, only_new, diff_type):
-    """过滤数据形状导致的假阳性：列表为空（无匹配）或字段可空（null）。"""
+    """过滤数据形状导致的假阳性：列表元素级差异（".[]"）与可空字段（null）。"""
     tolerable_base = {k: v for k, v in only_base.items() if ".[]" not in k}
     tolerable_new = {k: v for k, v in only_new.items() if ".[]" not in k}
-    tolerable_diff = {k: v for k, v in diff_type.items() if "null" not in v}
+    tolerable_diff = {k: v for k, v in diff_type.items() if ".[]" not in k and "null" not in v}
     return tolerable_base, tolerable_new, tolerable_diff
 
 

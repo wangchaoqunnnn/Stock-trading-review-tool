@@ -8,6 +8,7 @@ stockreview 包（见 stockreview/__init__.py 说明）；本文件仅保留
 HTTP 路由、缓存实例与启动逻辑，对外 API 与页面路径保持不变。
 """
 import json
+import math
 import os
 import sys
 import urllib.parse
@@ -16,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from stockreview.cache import SnapshotCache
 from stockreview.config import DEFAULT_PORT, STATIC_DIR
 from stockreview.flow3 import fetch_flow3_scan
+from stockreview.limit20 import fetch_limit20_scan
 from stockreview.pullback import fetch_pullback_scan
 from stockreview.realtime import fetch_realtime
 from stockreview.snapshot import fetch_snapshot
@@ -32,6 +34,7 @@ PULLBACK_CACHE = SnapshotCache(ttl=120, fetcher=fetch_pullback_scan)
 # 新增策略扫描较慢，使用更长缓存
 FLOW3_CACHE = SnapshotCache(ttl=600, fetcher=fetch_flow3_scan)
 TREND3_CACHE = SnapshotCache(ttl=600, fetcher=fetch_trend3_scan)
+LIMIT20_CACHE = SnapshotCache(ttl=600, fetcher=fetch_limit20_scan)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -59,8 +62,19 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
+    @staticmethod
+    def _sanitize(obj):
+        """把 NaN/Infinity 转为 None——它们不是合法 JSON，浏览器 JSON.parse 会抛错。"""
+        if isinstance(obj, float):
+            return None if (math.isnan(obj) or math.isinf(obj)) else obj
+        if isinstance(obj, dict):
+            return {k: Handler._sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [Handler._sanitize(v) for v in obj]
+        return obj
+
     def _send_json(self, obj, status=200):
-        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        body = json.dumps(self._sanitize(obj), ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
@@ -111,6 +125,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(TREND3_CACHE.get())
         elif path == "/api/trend3_refresh":
             self._send_json(TREND3_CACHE.get(force=True))
+        elif path == "/api/limit20":
+            self._send_json(LIMIT20_CACHE.get())
+        elif path == "/api/limit20_refresh":
+            self._send_json(LIMIT20_CACHE.get(force=True))
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

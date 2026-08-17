@@ -19,7 +19,7 @@ from stockreview.trend3 import fetch_trend3_scan  # noqa: E402
 
 
 class FakeDT:
-    fixed = datetime(2026, 8, 14, 10, 30, 0)
+    fixed = datetime(2026, 8, 15, 10, 30, 0)
 
     @classmethod
     def now(cls):
@@ -123,6 +123,84 @@ KLINE_MAP = {
 }
 
 
+def build_kline_sideways(n=45, base=10.0, vol=1_000_000.0, flat_days=25):
+    """横盘震荡K线：前期缓涨到位，最后 flat_days 天收盘价恒定（高/低在±1%内波动）。
+
+    横盘段收盘价恒定 → MA20 与 5 日前 MA20 完全相等（满足"走平"），
+    且不属于上升趋势（ma20 > ma20_prev5 不成立）。
+    """
+    rows = []
+    close = base
+    flat_level = None
+    for i in range(n):
+        if i < n - flat_days:
+            open_ = close
+            close = close * 1.004
+            volume = vol
+        else:
+            if flat_level is None:
+                flat_level = close
+            open_ = flat_level
+            close = flat_level
+            volume = vol
+        rows.append({
+            "date": f"2026-08-{i:02d}", "open": round(open_, 2), "close": round(close, 2),
+            "high": round(max(open_, close) * 1.01, 2), "low": round(min(open_, close) * 0.99, 2),
+            "volume": volume, "amount": volume * close, "pct": round((close / open_ - 1) * 100, 2),
+        })
+    return rows
+
+
+def build_kline_downtrend(n=40, base=10.0, vol=1_000_000.0):
+    """下降趋势K线：前期缓涨后连续回落，收盘明显跌破 MA20。"""
+    rows = []
+    close = base
+    for i in range(n):
+        if i < n - 12:
+            open_ = close
+            close = close * 1.004
+        else:
+            open_ = close
+            close = close * 0.98
+        volume = vol
+        rows.append({
+            "date": f"2026-08-{i:02d}", "open": round(open_, 2), "close": round(close, 2),
+            "high": round(max(open_, close) * 1.01, 2), "low": round(min(open_, close) * 0.99, 2),
+            "volume": volume, "amount": volume * close, "pct": round((close / open_ - 1) * 100, 2),
+        })
+    return rows
+
+
+# limit20 用：历史涨停池（按日期）
+FAKE_ZT_BY_DATE = {
+    "20260813": {"tc": 3, "pool": [
+        {"c": "600001", "n": "甲科技", "hybk": "半导体", "lbc": 1},
+        {"c": "600002", "n": "乙软件", "hybk": "半导体", "lbc": 0},
+        {"c": "600003", "n": "丙数据", "hybk": "通信", "lbc": 0},
+    ]},
+    "20260814": {"tc": 2, "pool": [
+        {"c": "600001", "n": "甲科技", "hybk": "半导体", "lbc": 2},
+        {"c": "600004", "n": "丁材料", "hybk": "有色", "lbc": 0},
+    ]},
+    "20260815": {"tc": 1, "pool": [
+        {"c": "600005", "n": "戊能源", "hybk": "电力", "lbc": 0},
+    ]},
+}
+
+LIMIT20_KLINE_MAP = {
+    "600001": KLINE_MAP["600001"],                    # 上升趋势
+    "600002": build_kline_sideways(),                 # 横盘震荡
+    "600003": build_kline_downtrend(),                # 下降趋势
+    "600004": build_kline_sideways(base=8.0),         # 横盘震荡
+    "600005": build_kline_sideways(base=12.0),        # 横盘震荡
+}
+
+
+def fake_ex_pool(path, date=None):
+    d = FAKE_ZT_BY_DATE.get(date, {"tc": 0, "pool": []})
+    return {"tc": d["tc"], "pool": [dict(x) for x in d["pool"]]}
+
+
 def patch_fetchers():
     em.fetch_industry_boards = lambda: [dict(x) for x in FAKE_BOARDS]
     em.fetch_concept_boards = lambda: [dict(x) for x in FAKE_CONCEPT]
@@ -168,6 +246,15 @@ def main():
     check(analysis.is_uptrend(down_hist) is False, "is_uptrend = False（跌破MA20）")
     check(analysis.pct_5d(hist) is not None, "pct_5d 可计算")
 
+    sw_hist = build_kline_sideways()
+    dt_hist = build_kline_downtrend()
+    check(analysis.is_sideways(sw_hist) is True, "is_sideways = True（横盘震荡）")
+    check(analysis.is_sideways(KLINE_MAP["600001"]) is False, "上升趋势K线不是横盘")
+    check(analysis.is_sideways(dt_hist) is False, "下降趋势K线不是横盘")
+    check(analysis.classify_state(KLINE_MAP["600001"]) == "uptrend", "classify_state -> uptrend")
+    check(analysis.classify_state(sw_hist) == "sideways", "classify_state -> sideways")
+    check(analysis.classify_state(dt_hist) == "downtrend", "classify_state -> downtrend")
+
     print("== flow3 离线扫描 ==")
     patch_fetchers()
     flow3 = fetch_flow3_scan()
@@ -192,11 +279,37 @@ def main():
     check("人工智能" not in boards, "板块【人工智能】仅2日，不入选")
     check(trend3["scanned_stocks"] == 3 and trend3["scanned_boards"] == 3, "trend3 预筛计数正确")
 
+    print("== limit20 离线扫描 ==")
+    em.fetch_ex_pool = fake_ex_pool
+    em.fetch_kline_hist = lambda code, limit=45: [dict(x) for x in LIMIT20_KLINE_MAP.get(str(code), [])]
+
+    def limit20_stocks():
+        rows = [dict(x) for x in FAKE_STOCKS]  # 600001/600002/600003
+        rows.append(stock_row("600004", "丁材料", 1.0, 5.0e8, 1.1, 1.0e8, industry="有色"))
+        rows.append(stock_row("600005", "戊能源", 0.5, 5.0e8, 1.0, 5.0e7, industry="电力"))
+        rows.append(stock_row("600006", "己汽车", 0.8, 5.0e8, 1.0, 1.0e8, industry="汽车"))  # 无涨停史
+        return rows
+    net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: limit20_stocks()
+    import stockreview.limit20 as limit20_mod
+    limit20_mod.datetime = FakeDT
+    d20 = limit20_mod.fetch_limit20_scan()
+    up_stocks = {x["name"]: x for x in d20["uptrend_stocks"]}
+    sw_stocks = {x["name"]: x for x in d20["sideways_stocks"]}
+    check(d20["universe"] == 5, f"20日内封涨停 {d20['universe']} 只（应为5）")
+    check(d20["uptrend_count"] == 1 and d20["sideways_count"] == 3, "上升1 / 横盘3 计数正确")
+    check(up_stocks.get("甲科技", {}).get("state") == "uptrend" and up_stocks["甲科技"]["days_since"] == 1,
+          "甲科技=上升趋势，距涨停1个交易日（0814涨停）")
+    check(sw_stocks.get("乙软件", {}).get("state") == "sideways" and sw_stocks["乙软件"]["days_since"] == 2,
+          "乙软件=横盘震荡，距涨停2个交易日（0813涨停）")
+    check("丙数据" not in up_stocks and "丙数据" not in sw_stocks, "丙数据为下降趋势，不入选")
+    check("丁材料" in sw_stocks and "戊能源" in sw_stocks, "丁材料/戊能源=横盘震荡入选")
+    check(d20["window_dates"][-1] == "2026-08-15", "统计窗口含当日")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

@@ -347,3 +347,47 @@ def pct_5d(hist):
         return None
     base = hist[-6]["close"]
     return round((hist[-1]["close"] / base - 1) * 100, 2) if base else None
+
+
+# ---------- 涨停后形态：横盘震荡 / 上升趋势 ----------
+
+# 横盘震荡判定参数
+SIDEWAYS_RANGE = 0.15     # 近10日振幅上限（最高-最低）/最低
+SIDEWAYS_MA_BAND = 0.05   # 收盘价偏离 MA20 上限
+SIDEWAYS_MA_FLAT = 0.03   # MA20 走平阈值（相对5日前）
+
+
+def is_sideways(hist):
+    """横盘震荡：近10日振幅收敛、价格贴近走平的 MA20。"""
+    if len(hist) < 25:
+        return False
+    closes = [h["close"] for h in hist]
+    highs = [h["high"] for h in hist]
+    lows = [h["low"] for h in hist]
+    ma20 = sum(closes[-20:]) / 20
+    ma20_prev5 = sum(closes[-25:-5]) / 20
+    if ma20 <= 0 or ma20_prev5 <= 0:
+        return False
+    recent_high = max(highs[-10:])
+    recent_low = min(lows[-10:])
+    if recent_low <= 0:
+        return False
+    rng = (recent_high - recent_low) / recent_low
+    close = closes[-1]
+    return (
+        rng <= SIDEWAYS_RANGE
+        and abs(close / ma20 - 1) <= SIDEWAYS_MA_BAND
+        and abs(ma20 / ma20_prev5 - 1) <= SIDEWAYS_MA_FLAT
+    )
+
+
+def classify_state(hist):
+    """涨停后当前状态：uptrend（上升趋势）/ sideways（横盘震荡）/ downtrend（下降趋势）。"""
+    if is_uptrend(hist):
+        return "uptrend"
+    if is_sideways(hist):
+        return "sideways"
+    return "downtrend"
+
+
+STATE_LABELS = {"uptrend": "上升趋势", "sideways": "横盘震荡", "downtrend": "下降趋势"}

@@ -8,6 +8,7 @@ import { loadVolPrice } from "./volprice.js";
 import { loadPullback } from "./pullback.js";
 import { loadFlow3 } from "./flow3.js";
 import { loadTrend3 } from "./trend3.js";
+import { loadLimit20 } from "./limit20.js";
 
 // Tab -> 页面元素 id / 数据加载函数
 const PAGES = {
@@ -17,6 +18,7 @@ const PAGES = {
   pullback: "page-pullback",
   flow3: "page-flow3",
   trend3: "page-trend3",
+  limit20: "page-limit20",
 };
 const LOADERS = {
   daily: load,
@@ -25,6 +27,7 @@ const LOADERS = {
   pullback: loadPullback,
   flow3: loadFlow3,
   trend3: loadTrend3,
+  limit20: loadLimit20,
 };
 
 let activeTab = "daily";

@@ -26,6 +26,7 @@
     <button class="tab" data-tab="pullback" type="button">涨停回踩</button>
     <button class="tab" data-tab="flow3" type="button">3日资金</button>
     <button class="tab" data-tab="trend3" type="button">放量阳线</button>
+    <button class="tab" data-tab="limit20" type="button">涨停横盘</button>
   </nav>
 
   <main>
@@ -169,6 +170,19 @@
       <section class="panel">
         <h2>连续3日+ 小幅放量阳线板块</h2>
         <div id="t3Boards"></div>
+      </section>
+    </section>
+
+    <section id="page-limit20" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="l20State" class="rt-state">加载中...</span></h2>
+        <div id="l20Market"></div>
+        <div id="l20Summary"></div>
+      </section>
+      <section class="panel">
+        <h2>20日内封涨停 · 横盘震荡/上升趋势 <span class="sub">涨停池口径（封板到收盘）；上升趋势=站上MA20且MA20走高；横盘震荡=近10日振幅≤15%且价格贴近走平的MA20</span></h2>
+        <div id="l20Uptrend"></div>
+        <div id="l20Sideways"></div>
       </section>
     </section>
 
