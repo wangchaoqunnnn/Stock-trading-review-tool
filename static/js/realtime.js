@@ -2,6 +2,50 @@
 
 import { $, esc, fmt, pctClass, signed } from "./utils.js";
 import { renderSignals, renderErrors } from "./daily.js";
+import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
+
+const RT_INDEX_HEADERS = [
+  { key: "name", label: "指数" },
+  { key: "current", label: "最新", align: "num", dir: -1 },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "avg_price", label: "分时均价", align: "num", dir: -1 },
+  { key: "vs_avg_pct", label: "相对均价", align: "num", dir: -1 },
+];
+const RT_BOARD_HEADERS = [
+  { key: "name", label: "板块" },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "flow_yi", label: "主力(亿)", align: "num", dir: -1 },
+  { key: "zt_count", label: "涨停", align: "num", dir: -1 },
+  { key: "delta_flow", label: "环比主力", align: "num", dir: -1 },
+  { key: "leader", label: "龙头" },
+];
+const RT_YZT_HEADERS = [
+  { key: "code", label: "代码" },
+  { key: "name", label: "名称" },
+  { key: "pct", label: "今日涨跌", align: "num", dir: -1 },
+  { key: "lbc", label: "昨日连板", align: "num", dir: -1 },
+];
+const RT_WATCH_HEADERS = [
+  { key: "code", label: "代码" },
+  { key: "name", label: "名称" },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "lbc", label: "连板", align: "num", dir: -1 },
+  { key: "fbt", label: "首封" },
+  { key: "zbc", label: "炸板", align: "num", dir: -1 },
+  { key: "flow_yi", label: "封单/主力(亿)", align: "num", dir: -1 },
+  { key: "vol_ratio", label: "量比", align: "num", dir: -1 },
+  { key: "turnover", label: "换手", align: "num", dir: -1 },
+  { key: "vs_avg", label: "分时均价", align: "num", dir: -1 },
+  { key: "alerts", label: "信号" },
+];
+
+let lastData = null;
+registerSortable("rt-indices", RT_INDEX_HEADERS, () => renderRealtime(lastData));
+registerSortable("rt-ind-top", RT_BOARD_HEADERS, () => renderRealtime(lastData));
+registerSortable("rt-ind-flow", RT_BOARD_HEADERS, () => renderRealtime(lastData));
+registerSortable("rt-con-flow", RT_BOARD_HEADERS, () => renderRealtime(lastData));
+registerSortable("rt-yzt", RT_YZT_HEADERS, () => renderRealtime(lastData));
+registerSortable("rt-watch", RT_WATCH_HEADERS, () => renderRealtime(lastData));
 
 function renderRtPhase(d) {
   const p = d.phase || {};
@@ -9,7 +53,7 @@ function renderRtPhase(d) {
 }
 
 function renderRtIndices(d) {
-  const rows = (d.indices || []).map((i) => `
+  const rows = sortableRows("rt-indices", d.indices || []).map((i) => `
     <tr>
       <td>${esc(i.name)}</td>
       <td class="num ${pctClass(i.pct)}">${fmt(i.current)}</td>
@@ -17,7 +61,7 @@ function renderRtIndices(d) {
       <td class="num">${i.avg_price ? fmt(i.avg_price) : "--"}</td>
       <td class="num ${i.above_avg == null ? "flat" : (i.above_avg ? "up" : "down")}">${i.above_avg == null ? "--" : (i.above_avg ? "上方" : "下方") + " " + signed(i.vs_avg_pct)}</td>
     </tr>`).join("");
-  $("rtIndices").innerHTML = `<table><thead><tr><th>指数</th><th class="num">最新</th><th class="num">涨跌</th><th class="num">分时均价</th><th class="num">相对均价</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $("rtIndices").innerHTML = `<table><thead><tr>${sortableHead("rt-indices", RT_INDEX_HEADERS)}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderRtEmotion(d) {
@@ -34,7 +78,7 @@ function renderRtEmotion(d) {
 
 function renderRtYesterday(d) {
   const y = d.yesterday_zt || {};
-  const samples = (y.samples || []).slice(0, 8).map((s) => `
+  const samples = sortableRows("rt-yzt", (y.samples || []).slice(0, 8)).map((s) => `
     <tr>
       <td>${esc(s.code)}</td><td>${esc(s.name)}</td>
       <td class="num ${pctClass(s.pct)}">${signed(s.pct)}</td>
@@ -42,13 +86,13 @@ function renderRtYesterday(d) {
     </tr>`).join("");
   $("rtYesterday").innerHTML =
     `<div class="subtitle">昨日涨停今日溢价：平均 <b class="${pctClass(y.avg_pct)}">${signed(y.avg_pct)}</b>，上涨 ${y.up || 0} / 下跌 ${y.down || 0}，样本 ${y.matched || 0} 只</div>` +
-    (samples ? `<table><thead><tr><th>代码</th><th>名称</th><th class="num">今日涨跌</th><th class="num">昨日连板</th></tr></thead><tbody>${samples}</tbody></table>` : `<div class="subtitle">暂无昨日涨停样本</div>`);
+    (samples ? `<table><thead><tr>${sortableHead("rt-yzt", RT_YZT_HEADERS)}</tr></thead><tbody>${samples}</tbody></table>` : `<div class="subtitle">暂无昨日涨停样本</div>`);
 }
 
-function rtBoardTable(rows) {
+function rtBoardTable(groupId, rows) {
   if (!rows || !rows.length) return `<div class="subtitle">暂无数据</div>`;
-  return `<table><thead><tr><th>板块</th><th class="num">涨跌</th><th class="num">主力(亿)</th><th class="num">涨停</th><th class="num">环比主力</th><th>龙头</th></tr></thead><tbody>` +
-    rows.map((r) => `<tr>
+  return `<table><thead><tr>${sortableHead(groupId, RT_BOARD_HEADERS)}</tr></thead><tbody>` +
+    sortableRows(groupId, rows).map((r) => `<tr>
       <td>${esc(r.name)}</td>
       <td class="num ${pctClass(r.pct)}">${signed(r.pct)}</td>
       <td class="num ${pctClass(r.flow_yi)}">${signed(r.flow_yi, 2, "")}</td>
@@ -60,16 +104,16 @@ function rtBoardTable(rows) {
 
 function renderRtSectors(d) {
   let html = `<div class="subtitle">行业涨幅 TOP8（涨停家数 / 龙头封板 / 环比主力）</div>`;
-  html += rtBoardTable((d.industry_top || []).slice(0, 8));
+  html += rtBoardTable("rt-ind-top", (d.industry_top || []).slice(0, 8));
   html += `<div class="subtitle">行业主力净流入 TOP8</div>`;
-  html += rtBoardTable((d.industry_flow || []).slice(0, 8));
+  html += rtBoardTable("rt-ind-flow", (d.industry_flow || []).slice(0, 8));
   html += `<div class="subtitle">概念主力净流入 TOP8</div>`;
-  html += rtBoardTable((d.concept_top_flow || []).slice(0, 8));
+  html += rtBoardTable("rt-con-flow", (d.concept_top_flow || []).slice(0, 8));
   $("rtSectors").innerHTML = html;
 }
 
 function renderRtWatchlist(d) {
-  const rows = (d.watchlist || []).map((s) => {
+  const rows = sortableRows("rt-watch", d.watchlist || []).map((s) => {
     const alerts = (s.alerts || []).map((a) => `<span class="alert-tag">${esc(a)}</span>`).join(" ");
     return `<tr>
       <td>${esc(s.code)}</td>
@@ -86,10 +130,11 @@ function renderRtWatchlist(d) {
     </tr>`;
   }).join("");
   $("rtWatchlist").innerHTML =
-    `<table><thead><tr><th>代码</th><th>名称</th><th class="num">涨跌</th><th class="num">连板</th><th>首封</th><th class="num">炸板</th><th class="num">封单/主力(亿)</th><th class="num">量比</th><th class="num">换手</th><th class="num">分时均价</th><th>信号</th></tr></thead><tbody>${rows}</tbody></table>`;
+    `<table><thead><tr>${sortableHead("rt-watch", RT_WATCH_HEADERS)}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderRealtime(d) {
+  lastData = d;
   renderRtPhase(d);
   renderRtIndices(d);
   renderRtEmotion(d);

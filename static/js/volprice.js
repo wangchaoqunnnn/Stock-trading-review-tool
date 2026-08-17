@@ -1,6 +1,34 @@
 /* ---------- 量价异动 ---------- */
 
 import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
+
+const VP_BOARD_HEADERS = [
+  { key: "name", label: "板块" },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "flow_yi", label: "主力(亿)", align: "num", dir: -1 },
+];
+const VP_HEADERS = [
+  { key: "code", label: "代码" },
+  { key: "name", label: "名称" },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "speed", label: "涨速", align: "num", dir: -1 },
+  { key: "vol_ratio", label: "量比", align: "num", dir: -1 },
+  { key: "turnover", label: "换手", align: "num", dir: -1 },
+  { key: "amount_yi", label: "成交(亿)", align: "num", dir: -1 },
+  { key: "main_flow", label: "主力(亿)", align: "num", dir: -1 },
+  { key: "industry", label: "板块" },
+  { key: "ma20", label: "MA20", align: "num", dir: -1 },
+  { key: "hist_vol_ratio", label: "5日量比", align: "num", dir: -1 },
+  { key: "break_high20", label: "20日新高" },
+  { key: "tags", label: "信号" },
+];
+
+let lastData = null;
+registerSortable("vp-boards", VP_BOARD_HEADERS, () => renderVolPrice(lastData));
+for (const name of ["放量上攻", "放量滞涨", "冲高回落", "缩量上涨", "放量下跌", "缩量回踩"]) {
+  registerSortable(`vp-${name}`, VP_HEADERS, () => renderVolPrice(lastData));
+}
 
 function vpBoardChips(d) {
   const m = d.market || {};
@@ -11,15 +39,15 @@ function vpBoardChips(d) {
 }
 
 function vpBoardTable(d) {
-  const rows = (d.strong_boards || []).slice(0, 8).map((b) => `
+  const rows = sortableRows("vp-boards", (d.strong_boards || []).slice(0, 8)).map((b) => `
     <tr><td>${esc(b.name)}</td><td class="num ${pctClass(b.pct)}">${signed(b.pct)}</td><td class="num ${pctClass(b.flow_yi)}">${signed(b.flow_yi, 2, "")}</td></tr>`).join("");
-  $("vpBoards").innerHTML = `<div class="subtitle">板块主力净流入 TOP8</div><table><thead><tr><th>板块</th><th class="num">涨跌</th><th class="num">主力(亿)</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $("vpBoards").innerHTML = `<div class="subtitle">板块主力净流入 TOP8</div><table><thead><tr>${sortableHead("vp-boards", VP_BOARD_HEADERS)}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function vpTable(stocks) {
+function vpTable(groupId, stocks) {
   if (!stocks || !stocks.length) return `<div class="subtitle">暂无</div>`;
-  return `<table><thead><tr><th>代码</th><th>名称</th><th class="num">涨跌</th><th class="num">涨速</th><th class="num">量比</th><th class="num">换手</th><th class="num">成交(亿)</th><th class="num">主力(亿)</th><th>板块</th><th class="num">MA20</th><th class="num">5日量比</th><th class="num">20日新高</th><th>信号</th></tr></thead><tbody>` +
-    stocks.map((s) => `<tr>
+  return `<table><thead><tr>${sortableHead(groupId, VP_HEADERS)}</tr></thead><tbody>` +
+    sortableRows(groupId, stocks).map((s) => `<tr>
       <td>${esc(s.code)}</td><td>${esc(s.name)}</td>
       <td class="num ${pctClass(s.pct)}">${signed(s.pct)}</td>
       <td class="num ${pctClass(s.speed)}">${signed(s.speed)}</td>
@@ -36,6 +64,7 @@ function vpTable(stocks) {
 }
 
 function renderVolPrice(d) {
+  lastData = d;
   vpBoardChips(d);
   vpBoardTable(d);
   const cats = d.categories || {};
@@ -44,7 +73,7 @@ function renderVolPrice(d) {
   for (const name of order) {
     const list = cats[name] || [];
     html += `<div class="subtitle">${name}（${list.length}）</div>`;
-    html += vpTable(list);
+    html += vpTable(`vp-${name}`, list);
   }
   $("vpCategories").innerHTML = html;
   $("vpState").textContent = "已更新 " + (d.as_of || "--");

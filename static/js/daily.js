@@ -2,6 +2,51 @@
 
 import { $, esc, fmt, pctClass, signed, toYi } from "./utils.js";
 import { auto } from "./state.js";
+import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
+
+const BOARD_HEADERS = [
+  { key: "name", label: "板块" },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "flow_yi", label: "主力(亿)", align: "num", dir: -1 },
+  { key: "leader", label: "领涨" },
+];
+const FLOW_HEADERS = [
+  { key: "code", label: "代码" },
+  { key: "name", label: "名称" },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "flow_yi", label: "主力(亿)", align: "num", dir: -1 },
+  { key: "amount_yi", label: "成交(亿)", align: "num", dir: -1 },
+];
+const ZT_BOARD_HEADERS = [
+  { key: "name", label: "行业" },
+  { key: "count", label: "家数", align: "num", dir: -1 },
+  { key: "fund_yi", label: "封单(亿)", align: "num", dir: -1 },
+  { key: "max_lb", label: "最高连板", align: "num", dir: -1 },
+];
+const WATCH_HEADERS = [
+  { key: "code", label: "代码" },
+  { key: "name", label: "名称" },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "lbc", label: "连板", align: "num", dir: -1 },
+  { key: "flow_yi", label: "封单/主力(亿)", align: "num", dir: -1 },
+  { key: "fbt", label: "首封" },
+];
+const AUCTION_HEADERS = [
+  { key: "c", label: "代码" },
+  { key: "n", label: "名称" },
+  { key: "fund", label: "封单(亿)", align: "num", dir: -1 },
+  { key: "hybk", label: "行业" },
+];
+
+let lastData = null;
+registerSortable("sec-ind-pct", BOARD_HEADERS, () => render(lastData));
+registerSortable("sec-ind-flow", BOARD_HEADERS, () => render(lastData));
+registerSortable("sec-con-flow", BOARD_HEADERS, () => render(lastData));
+registerSortable("daily-inflow", FLOW_HEADERS, () => render(lastData));
+registerSortable("daily-outflow", FLOW_HEADERS, () => render(lastData));
+registerSortable("zt-byboard", ZT_BOARD_HEADERS, () => render(lastData));
+registerSortable("zt-watch", WATCH_HEADERS, () => render(lastData));
+registerSortable("zt-auction", AUCTION_HEADERS, () => render(lastData));
 
 export function renderSignals(d, target = "signals") {
   const items = (d.signals || []).map((s) => {
@@ -68,34 +113,34 @@ function renderEmotion(d) {
   ].join("");
 }
 
-function boardTable(rows, extra = "") {
+function boardTable(groupId, rows, extra = "") {
   if (!rows || !rows.length) return `<div class="subtitle">暂无数据</div>`;
-  const head = `<tr><th>板块</th><th class="num">涨跌</th><th class="num">主力(亿)</th><th class="num">领涨</th></tr>`;
-  const body = rows.map((r) => `
+  const head = sortableHead(groupId, BOARD_HEADERS);
+  const body = sortableRows(groupId, rows).map((r) => `
     <tr>
       <td>${esc(r.name)}</td>
       <td class="num ${pctClass(r.pct)}">${signed(r.pct)}</td>
       <td class="num ${pctClass(r.flow_yi)}">${signed(r.flow_yi, 2, "")}</td>
       <td>${esc(r.leader || "--")}</td>
     </tr>`).join("");
-  return `<table><thead>${head}</thead><tbody>${body}</tbody></table>${extra}`;
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${extra}`;
 }
 
 function renderSectors(d) {
   const s = d.sectors || {};
   let html = `<div class="subtitle">行业 · 涨幅TOP8</div>`;
-  html += boardTable((s.industry_top_pct || []).slice(0, 8));
+  html += boardTable("sec-ind-pct", (s.industry_top_pct || []).slice(0, 8));
   html += `<div class="subtitle">行业 · 主力净流入TOP8</div>`;
-  html += boardTable((s.industry_top_flow || []).slice(0, 8));
+  html += boardTable("sec-ind-flow", (s.industry_top_flow || []).slice(0, 8));
   html += `<div class="subtitle">概念 · 主力净流入TOP8</div>`;
-  html += boardTable((s.concept_top_flow || []).slice(0, 8));
+  html += boardTable("sec-con-flow", (s.concept_top_flow || []).slice(0, 8));
   $("sectors").innerHTML = html;
 }
 
-function flowTable(rows) {
+function flowTable(groupId, rows) {
   if (!rows || !rows.length) return `<div class="subtitle">暂无数据</div>`;
-  const head = `<tr><th>代码</th><th>名称</th><th class="num">涨跌</th><th class="num">主力(亿)</th><th class="num">成交(亿)</th></tr>`;
-  const body = rows.map((r) => `
+  const head = sortableHead(groupId, FLOW_HEADERS);
+  const body = sortableRows(groupId, rows).map((r) => `
     <tr>
       <td>${esc(r.code)}</td>
       <td>${esc(r.name)}</td>
@@ -103,28 +148,28 @@ function flowTable(rows) {
       <td class="num ${pctClass(r.flow_yi)}">${signed(r.flow_yi, 2, "")}</td>
       <td class="num">${fmt(r.amount_yi)}</td>
     </tr>`).join("");
-  return `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function renderFlows(d) {
   const f = d.flows || {};
   $("flows").innerHTML =
-    `<div class="subtitle">主力净流入 TOP10</div>` + flowTable((f.inflow || []).slice(0, 10)) +
-    `<div class="subtitle">主力净流出 TOP10</div>` + flowTable((f.outflow || []).slice(0, 10));
+    `<div class="subtitle">主力净流入 TOP10</div>` + flowTable("daily-inflow", (f.inflow || []).slice(0, 10)) +
+    `<div class="subtitle">主力净流出 TOP10</div>` + flowTable("daily-outflow", (f.outflow || []).slice(0, 10));
 }
 
 function renderZt(d) {
   const z = d.zt_summary || {};
   const byBoard = (z.by_board || []).slice(0, 8);
   let html = `<div class="subtitle">涨停行业分布 TOP8</div>`;
-  html += `<table><thead><tr><th>行业</th><th class="num">家数</th><th class="num">封单(亿)</th><th class="num">最高连板</th></tr></thead><tbody>` +
-    byBoard.map((r) => `<tr><td>${esc(r.name)}</td><td class="num up">${r.count}</td><td class="num">${fmt(r.fund_yi)}</td><td class="num">${r.max_lb}板</td></tr>`).join("") +
+  html += `<table><thead><tr>${sortableHead("zt-byboard", ZT_BOARD_HEADERS)}</tr></thead><tbody>` +
+    sortableRows("zt-byboard", byBoard).map((r) => `<tr><td>${esc(r.name)}</td><td class="num up">${r.count}</td><td class="num">${fmt(r.fund_yi)}</td><td class="num">${r.max_lb}板</td></tr>`).join("") +
     `</tbody></table>`;
 
   html += `<div class="subtitle">观察池（连板 / 主力资金）</div>`;
   const w = (d.watchlist || []).slice(0, 15);
-  html += `<table><thead><tr><th>代码</th><th>名称</th><th class="num">涨跌</th><th class="num">连板</th><th class="num">封单/主力(亿)</th><th>首封</th></tr></thead><tbody>` +
-    w.map((r) => `<tr>
+  html += `<table><thead><tr>${sortableHead("zt-watch", WATCH_HEADERS)}</tr></thead><tbody>` +
+    sortableRows("zt-watch", w).map((r) => `<tr>
       <td>${esc(r.code)}</td><td>${esc(r.name)}</td>
       <td class="num ${pctClass(r.pct)}">${signed(r.pct)}</td>
       <td class="num">${r.lbc ? `<span class="badge lb">${r.lbc}板</span>` : "--"}</td>
@@ -135,8 +180,8 @@ function renderZt(d) {
 
   const auction = (z.auction || []).slice(0, 5);
   html += `<div class="subtitle">竞价(09:25)封板</div>`;
-  html += `<table><thead><tr><th>代码</th><th>名称</th><th class="num">封单(亿)</th><th>行业</th></tr></thead><tbody>` +
-    auction.map((r) => `<tr><td>${esc(r.c)}</td><td>${esc(r.n)}</td><td class="num">${fmt(toYi(r.fund))}</td><td>${esc(r.hybk || "")}</td></tr>`).join("") +
+  html += `<table><thead><tr>${sortableHead("zt-auction", AUCTION_HEADERS)}</tr></thead><tbody>` +
+    sortableRows("zt-auction", auction).map((r) => `<tr><td>${esc(r.c)}</td><td>${esc(r.n)}</td><td class="num">${fmt(toYi(r.fund))}</td><td>${esc(r.hybk || "")}</td></tr>`).join("") +
     `</tbody></table>`;
   $("ztpool").innerHTML = html;
 }
@@ -153,6 +198,7 @@ function renderNews(d) {
 }
 
 function render(d) {
+  lastData = d;
   renderKpis(d);
   renderEmotion(d);
   renderSignals(d);

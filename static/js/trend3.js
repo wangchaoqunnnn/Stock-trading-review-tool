@@ -1,6 +1,33 @@
 /* ---------- 放量阳线（3日+ 连续小幅放量阳线、上升趋势） ---------- */
 
 import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
+
+const T3_STOCK_HEADERS = [
+  { key: "code", label: "代码" },
+  { key: "name", label: "名称" },
+  { key: "days", label: "连续阳线", align: "num", dir: -1 },
+  { key: "pct", label: "今日涨跌", align: "num", dir: -1 },
+  { key: "vol_ratio", label: "量比", align: "num", dir: -1 },
+  { key: "pct_5d", label: "近5日涨幅", align: "num", dir: -1 },
+  { key: "ma20", label: "MA20", align: "num", dir: -1 },
+  { key: "amount_yi", label: "成交(亿)", align: "num", dir: -1 },
+  { key: "turnover", label: "换手", align: "num", dir: -1 },
+  { key: "industry", label: "板块" },
+];
+const T3_BOARD_HEADERS = [
+  { key: "name", label: "板块" },
+  { key: "days", label: "连续阳线", align: "num", dir: -1 },
+  { key: "pct", label: "今日涨跌", align: "num", dir: -1 },
+  { key: "vol_ratio", label: "量比", align: "num", dir: -1 },
+  { key: "pct_5d", label: "近5日涨幅", align: "num", dir: -1 },
+  { key: "ma20", label: "MA20", align: "num", dir: -1 },
+  { key: "flow_yi", label: "今日主力(亿)", align: "num", dir: -1 },
+];
+
+let lastData = null;
+registerSortable("t3-stocks", T3_STOCK_HEADERS, () => renderTrend3(lastData));
+registerSortable("t3-boards", T3_BOARD_HEADERS, () => renderTrend3(lastData));
 
 function t3MarketChips(d) {
   const m = d.market || {};
@@ -12,8 +39,8 @@ function t3MarketChips(d) {
 
 function t3StockTable(rows) {
   if (!rows || !rows.length) return `<div class="subtitle">暂无符合条件的个股</div>`;
-  return `<table><thead><tr><th>代码</th><th>名称</th><th class="num">连续阳线</th><th class="num">今日涨跌</th><th class="num">量比</th><th class="num">近5日涨幅</th><th class="num">MA20</th><th class="num">成交(亿)</th><th class="num">换手</th><th>板块</th></tr></thead><tbody>` +
-    rows.map((r) => `<tr>
+  return `<table><thead><tr>${sortableHead("t3-stocks", T3_STOCK_HEADERS)}</tr></thead><tbody>` +
+    sortableRows("t3-stocks", rows).map((r) => `<tr>
       <td>${esc(r.code)}</td><td>${esc(r.name)}</td>
       <td class="num"><b>${r.days}天</b></td>
       <td class="num ${pctClass(r.pct)}">${signed(r.pct)}</td>
@@ -28,8 +55,8 @@ function t3StockTable(rows) {
 
 function t3BoardTable(rows) {
   if (!rows || !rows.length) return `<div class="subtitle">暂无符合条件的板块</div>`;
-  return `<table><thead><tr><th>板块</th><th class="num">连续阳线</th><th class="num">今日涨跌</th><th class="num">量比</th><th class="num">近5日涨幅</th><th class="num">MA20</th><th class="num">今日主力(亿)</th></tr></thead><tbody>` +
-    rows.map((r) => `<tr>
+  return `<table><thead><tr>${sortableHead("t3-boards", T3_BOARD_HEADERS)}</tr></thead><tbody>` +
+    sortableRows("t3-boards", rows).map((r) => `<tr>
       <td>${esc(r.name)}</td>
       <td class="num"><b>${r.days}天</b></td>
       <td class="num ${pctClass(r.pct)}">${signed(r.pct)}</td>
@@ -41,6 +68,7 @@ function t3BoardTable(rows) {
 }
 
 function renderTrend3(d) {
+  lastData = d;
   t3MarketChips(d);
   $("t3Summary").textContent = `个股预筛 ${d.scanned_stocks || 0} 只，命中 ${(d.stocks || []).length} 只；板块预筛 ${d.scanned_boards || 0} 个，命中 ${(d.boards || []).length} 个`;
   $("t3Stocks").innerHTML = t3StockTable(d.stocks || []);

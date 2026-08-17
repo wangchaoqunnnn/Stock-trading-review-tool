@@ -1,6 +1,35 @@
 /* ---------- 涨停回踩 ---------- */
 
 import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
+
+const PB_BOARD_HEADERS = [
+  { key: "name", label: "板块" },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "flow_yi", label: "主力(亿)", align: "num", dir: -1 },
+];
+const PB_HEADERS = [
+  { key: "code", label: "代码" },
+  { key: "name", label: "名称" },
+  { key: "price", label: "现价", align: "num", dir: -1 },
+  { key: "pct", label: "涨跌", align: "num", dir: -1 },
+  { key: "vol_ratio", label: "量比", align: "num", dir: -1 },
+  { key: "hist_vol_ratio", label: "5日量比", align: "num", dir: -1 },
+  { key: "turnover", label: "换手", align: "num", dir: -1 },
+  { key: "amount_yi", label: "成交(亿)", align: "num", dir: -1 },
+  { key: "main_flow", label: "主力(亿)", align: "num", dir: -1 },
+  { key: "industry", label: "板块" },
+  { key: "ma20", label: "MA20", align: "num", dir: -1 },
+  { key: "limit_date", label: "涨停日" },
+  { key: "limit_pct", label: "涨停涨幅", align: "num", dir: -1 },
+  { key: "days_since", label: "距涨停", align: "num", dir: 1 },
+  { key: "score", label: "评分", align: "num", dir: -1 },
+  { key: "tags", label: "信号" },
+];
+
+let lastData = null;
+registerSortable("pb-boards", PB_BOARD_HEADERS, () => renderPullback(lastData));
+registerSortable("pb-list", PB_HEADERS, () => renderPullback(lastData));
 
 function pbMarketChips(d) {
   const m = d.market || {};
@@ -11,15 +40,15 @@ function pbMarketChips(d) {
 }
 
 function pbBoardTable(d) {
-  const rows = (d.hot_boards || []).slice(0, 8).map((b) => `
+  const rows = sortableRows("pb-boards", (d.hot_boards || []).slice(0, 8)).map((b) => `
     <tr><td>${esc(b.name)}</td><td class="num ${pctClass(b.pct)}">${signed(b.pct)}</td><td class="num ${pctClass(b.flow_yi)}">${signed(b.flow_yi, 2, "")}</td></tr>`).join("");
-  $("pbBoards").innerHTML = `<div class="subtitle">热点板块主力净流入 TOP8</div><table><thead><tr><th>板块</th><th class="num">涨跌</th><th class="num">主力(亿)</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $("pbBoards").innerHTML = `<div class="subtitle">热点板块主力净流入 TOP8</div><table><thead><tr>${sortableHead("pb-boards", PB_BOARD_HEADERS)}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function pbTable(stocks) {
   if (!stocks || !stocks.length) return `<div class="subtitle">暂无符合条件的股票</div>`;
-  return `<table><thead><tr><th>代码</th><th>名称</th><th class="num">现价</th><th class="num">涨跌</th><th class="num">量比</th><th class="num">5日量比</th><th class="num">换手</th><th class="num">成交(亿)</th><th class="num">主力(亿)</th><th>板块</th><th class="num">MA20</th><th>涨停日</th><th class="num">涨停涨幅</th><th class="num">距涨停</th><th class="num">评分</th><th>信号</th></tr></thead><tbody>` +
-    stocks.map((s) => `<tr>
+  return `<table><thead><tr>${sortableHead("pb-list", PB_HEADERS)}</tr></thead><tbody>` +
+    sortableRows("pb-list", stocks).map((s) => `<tr>
       <td>${esc(s.code)}</td><td>${esc(s.name)}</td>
       <td class="num">${fmt(s.price)}</td>
       <td class="num ${pctClass(s.pct)}">${signed(s.pct)}</td>
@@ -39,6 +68,7 @@ function pbTable(stocks) {
 }
 
 function renderPullback(d) {
+  lastData = d;
   pbMarketChips(d);
   pbBoardTable(d);
   $("pbSummary").textContent = `扫描 ${d.scanned || 0} 只候选，命中 ${d.matched || 0} 只`;
