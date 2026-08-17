@@ -391,3 +391,33 @@ def classify_state(hist):
 
 
 STATE_LABELS = {"uptrend": "上升趋势", "sideways": "横盘震荡", "downtrend": "下降趋势"}
+
+
+# ---------- 突破新高判定 ----------
+
+def breakout_short(hist, days=20):
+    """突破近 days 日最高价。
+
+    返回 (是否突破, 前高) 或 None（数据不足）。
+    """
+    if len(hist) < days + 2:
+        return None
+    today = hist[-1]
+    prev_high = max(h["high"] for h in hist[-(days + 1):-1])
+    if prev_high <= 0:
+        return None
+    return today["high"] > prev_high, prev_high
+
+
+def breakout_hist(hist):
+    """突破可得历史最高价（除今日外的全部K线）。
+
+    返回 (是否突破, 前历史高) 或 None（数据不足）。
+    """
+    if len(hist) < 30:
+        return None
+    today = hist[-1]
+    prev_high = max(h["high"] for h in hist[:-1])
+    if prev_high <= 0:
+        return None
+    return today["high"] > prev_high, prev_high

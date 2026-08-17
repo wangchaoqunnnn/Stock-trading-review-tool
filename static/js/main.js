@@ -11,6 +11,7 @@ import { loadTrend3 } from "./trend3.js";
 import { loadLimit20 } from "./limit20.js";
 import { loadZtpool } from "./ztpool.js";
 import { loadHot } from "./hot.js";
+import { loadBreakout } from "./breakout.js";
 
 // Tab -> 页面元素 id / 数据加载函数
 const PAGES = {
@@ -23,6 +24,7 @@ const PAGES = {
   limit20: "page-limit20",
   ztpool: "page-ztpool",
   hot: "page-hot",
+  breakout: "page-breakout",
 };
 const LOADERS = {
   daily: load,
@@ -34,6 +36,7 @@ const LOADERS = {
   limit20: loadLimit20,
   ztpool: loadZtpool,
   hot: loadHot,
+  breakout: loadBreakout,
 };
 
 const REFRESH_INTERVAL = 30; // 自动刷新周期（秒）

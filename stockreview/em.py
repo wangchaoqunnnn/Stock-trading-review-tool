@@ -392,6 +392,75 @@ def fetch_kline_hist(code, limit=45):
         return []
 
 
+def _parse_kline_list(rows):
+    """把 K 线列表行（[date,open,close,high,low,volume,...]）转为字典行。"""
+    out = []
+    for row in rows:
+        try:
+            out.append({
+                "date": row[0],
+                "open": to_num(row[1]), "close": to_num(row[2]),
+                "high": to_num(row[3]), "low": to_num(row[4]),
+                "volume": to_num(row[5]),
+            })
+        except Exception:
+            continue
+    return out
+
+
+def fetch_long_kline(code, limit=250):
+    """长周期日K线（用于突破新高判定）。
+
+    腾讯优先；东财 kline 动态回溯（约 limit 个交易日）次之；新浪 45 天兜底。
+    """
+    prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
+    symbol = prefix + code
+    try:
+        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": f"{symbol},day,,,{limit},qfq"})
+        data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=2)
+        node = (data.get("data") or {}).get(symbol) or {}
+        rows = node.get("qfqday") or node.get("day") or []
+        out = _parse_kline_list(rows[-limit:])
+        if len(out) >= 25:
+            return out
+    except Exception:
+        pass
+    try:
+        # 东财长历史：beg 按 limit 向前推（约 1.6 倍自然日）
+        beg = (datetime.now() - timedelta(days=int(limit * 1.6) + 30)).strftime("%Y%m%d")
+        secid = ("1." if code.startswith("6") else "0.") + code
+        params = {
+            "secid": secid,
+            "fields1": "f1,f2,f3,f4,f5,f6",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+            "klt": 101, "fqt": 1, "beg": beg, "end": "20500101",
+        }
+        url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
+        data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"}, tries=2)
+        out = []
+        for line in (data.get("data") or {}).get("klines") or []:
+            p = line.split(",")
+            if len(p) < 11:
+                continue
+            out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
+        if len(out) >= 25:
+            return out
+    except Exception:
+        pass
+    try:
+        url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": 45})
+        text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"}, tries=2)
+        m = re.search(r"\[(.*)\]", text, re.S)
+        if m:
+            rows = json.loads("[" + m.group(1) + "]")
+            out = _parse_kline_list(rows)
+            if len(out) >= 25:
+                return out
+    except Exception:
+        pass
+    return []
+
+
 def fetch_fflow_daykline(secid, limit=0):
     """主力资金流历史（日线）。push2his 优先，push2delay 兜底（仅当日）。"""
     params = {

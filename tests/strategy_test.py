@@ -201,6 +201,32 @@ def fake_ex_pool(path, date=None):
     return {"tc": d["tc"], "pool": [dict(x) for x in d["pool"]]}
 
 
+def build_kline_breakout(n=260, hist_high=None, recent_high=9.3, today_high=10.5, base=9.2, vol=1_000_000.0):
+    """突破判定K线：前 n-1 天低波动，可指定历史高点/近20日高点/今日高点。"""
+    rows = []
+    for i in range(n):
+        high = base * 1.01
+        if hist_high and i == n - 60:
+            high = hist_high
+        if i >= n - 20:
+            high = max(high, recent_high)
+        if i == n - 1:
+            high = today_high
+        rows.append({
+            "date": f"2026-08-{i % 28 + 1:02d}", "open": base, "close": base * 0.99,
+            "high": high, "low": base * 0.98, "volume": vol, "amount": vol * base, "pct": -1.0,
+        })
+    return rows
+
+
+# breakout 用：各股票长K线
+BREAKOUT_KLINE_MAP = {
+    "600001": build_kline_breakout(hist_high=10.0, recent_high=9.3, today_high=10.5),   # 短期+历史双突破
+    "600002": build_kline_breakout(hist_high=12.0, recent_high=9.3, today_high=10.5),   # 仅短期突破
+    "600003": build_kline_breakout(hist_high=None, recent_high=10.0, today_high=9.8),   # 不突破
+}
+
+
 # ztpool 用：今日涨停/炸板/跌停池 + 行情补取
 FAKE_POOL_ZT = {"tc": 3, "pool": [
     {"c": "600001", "n": "甲科技", "hybk": "半导体", "fbt": 92500, "lbc": 2, "zbc": 0, "fund": 1.0e8, "zdp": 10.0, "amount": 2.0e8},
@@ -365,11 +391,32 @@ def main():
     check(top["甲科技"]["tags"] == ["半导体", "芯片"] and top["甲科技"]["popularity_tag"] == "首板涨停",
           "概念标签与状态解析正确")
 
+    print("== breakout 离线扫描 ==")
+    em.fetch_long_kline = lambda code, limit=250: [dict(x) for x in BREAKOUT_KLINE_MAP.get(str(code), [])]
+    net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: [
+        stock_row("600001", "甲科技", 5.0, 5.0e8, 1.8, 2.0e8),
+        stock_row("600002", "乙软件", 3.0, 5.0e8, 1.5, 1.5e8),
+        stock_row("600003", "丙数据", -1.0, 5.0e8, 1.0, 1.0e8),   # 今日下跌 → 预筛排除
+        stock_row("600004", "丁材料", 2.0, 5.0e8, 1.2, 2.5e8),   # 无K线数据 → 跳过
+    ]
+    import stockreview.breakout as breakout_mod
+    breakout_mod.datetime = FakeDT
+    bo = breakout_mod.fetch_breakout_scan()
+    short_map = {x["name"]: x for x in bo["short"]["stocks"]}
+    hist_map = {x["name"]: x for x in bo["hist"]["stocks"]}
+    check(bo["scanned"] == 3, f"预筛 3 只（丙下跌排除，丁无K线但计入候选）→ 实际 {bo['scanned']}")
+    check("甲科技" in short_map and "乙软件" in short_map and "丙数据" not in short_map and "丁材料" not in short_map,
+          "短期突破：甲/乙入选，丙不突破、丁无数据")
+    check("甲科技" in hist_map and "乙软件" not in hist_map, "历史突破：仅甲（乙历史高点12.0未突破）")
+    check(short_map["甲科技"]["break_pct"] > 0 and short_map["甲科技"]["vol_ratio"] == 1.8,
+          "突破幅度/量比字段正确")
+    check(bo["short"]["count"] == 2 and bo["hist"]["count"] == 1, "计数正确")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot), ("breakout", bo)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

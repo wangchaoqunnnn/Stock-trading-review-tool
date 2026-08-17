@@ -29,6 +29,7 @@
     <button class="tab" data-tab="limit20" type="button">涨停横盘</button>
     <button class="tab" data-tab="ztpool" type="button">今日涨停</button>
     <button class="tab" data-tab="hot" type="button">市场热度</button>
+    <button class="tab" data-tab="breakout" type="button">突破新高</button>
   </nav>
 
   <main>
@@ -230,6 +231,22 @@
       <section class="panel">
         <h2>热度上升最快 TOP50 <span class="sub">按热度排名上升幅度（hot_rank_chg）排序</span></h2>
         <div id="hotRising"></div>
+      </section>
+    </section>
+
+    <section id="page-breakout" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="boState" class="rt-state">加载中...</span></h2>
+        <div id="boMarket"></div>
+        <div id="boSummary"></div>
+      </section>
+      <section class="panel">
+        <h2>突破短期高点 <span id="boShortWindow" class="sub"></span></h2>
+        <div id="boShort"></div>
+      </section>
+      <section class="panel">
+        <h2>突破历史高点 <span id="boHistWindow" class="sub"></span></h2>
+        <div id="boHist"></div>
       </section>
     </section>
 
