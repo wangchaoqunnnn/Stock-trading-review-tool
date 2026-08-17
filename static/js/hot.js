@@ -18,6 +18,7 @@ const HOT_HEADERS = [
 let lastData = null;
 registerSortable("hot-top", HOT_HEADERS, () => renderHot(lastData));
 registerSortable("hot-rising", HOT_HEADERS, () => renderHot(lastData));
+registerSortable("hot-rising3", HOT_HEADERS, () => renderHot(lastData));
 
 function hotMarketChips(d) {
   const m = d.market || {};
@@ -48,6 +49,13 @@ function renderHot(d) {
   $("hotSource").textContent = `数据源：${d.source || "同花顺热股榜"} · 更新时间 ${d.as_of || "--"}`;
   $("hotTop").innerHTML = hotTable("hot-top", d.top?.stocks || []);
   $("hotRising").innerHTML = hotTable("hot-rising", d.rising?.stocks || []);
+  const r3 = d.rising3 || {};
+  if (r3.ready) {
+    $("hotR3State").textContent = `连续${r3.days || 3}个交易日排名逐日上升 · ${r3.count || 0} 只（服务端每日快照判定）`;
+  } else {
+    $("hotR3State").textContent = `数据积累中：今日快照已记录（已积累 ${r3.days_available || 1} 个交易日），需再有 ${(r3.days || 3) - 1} 个交易日后展示连续${r3.days || 3}日结果`;
+  }
+  $("hotRising3").innerHTML = hotTable("hot-rising3", r3.stocks || []);
   $("hotState").textContent = "已更新 " + (d.as_of || "--");
 }
 

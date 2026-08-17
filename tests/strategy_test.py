@@ -8,7 +8,7 @@
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -381,6 +381,12 @@ def main():
     net.http_get_json = lambda url, headers=None, tries=3: {"data": {"stock_list": [dict(x) for x in FAKE_HOT_LIST]}}
     import stockreview.hot as hot_mod
     hot_mod.datetime = FakeDT
+    test_hot_dir = os.path.join(ROOT, ".refactor_tmp", "test_hot")
+    os.makedirs(test_hot_dir, exist_ok=True)
+    hot_mod.DATA_DIR = test_hot_dir
+    hot_mod.SNAPSHOT_FILE = os.path.join(test_hot_dir, "hot_history.json")
+    if os.path.exists(hot_mod.SNAPSHOT_FILE):
+        os.remove(hot_mod.SNAPSHOT_FILE)
     hot = hot_mod.fetch_hot_scan()
     top = {x["name"]: x for x in hot["top"]["stocks"]}
     rising = {x["name"]: x for x in hot["rising"]["stocks"]}
@@ -390,6 +396,24 @@ def main():
     check(rising["乙软件"]["rank_chg"] == 3 and rising["乙软件"]["pct"] == 2.0, "行字段：排名变化/涨跌幅")
     check(top["甲科技"]["tags"] == ["半导体", "芯片"] and top["甲科技"]["popularity_tag"] == "首板涨停",
           "概念标签与状态解析正确")
+    check(hot["rising3"]["ready"] is False and hot["rising3"]["count"] == 0 and hot["rising3"]["days_available"] == 1,
+          "连续3日：首日数据积累中（已积累1天，ready=False）")
+
+    # 场景2：预写昨日+前日快照（FakeDT=2026-08-15 → 昨日08-14/前日08-13）
+    yesterday = (FakeDT.fixed - timedelta(days=1)).strftime("%Y-%m-%d")
+    before = (FakeDT.fixed - timedelta(days=2)).strftime("%Y-%m-%d")
+    history = {
+        before: {"600001": {"order": 5, "chg": -1}, "600002": {"order": 6, "chg": 0}, "600003": {"order": 7, "chg": 1}, "600004": {"order": 5, "chg": 1}},
+        yesterday: {"600001": {"order": 3, "chg": 2}, "600002": {"order": 4, "chg": 1}, "600003": {"order": 8, "chg": -1}, "600004": {"order": 6, "chg": 1}},
+    }
+    with open(hot_mod.SNAPSHOT_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False)
+    hot2 = hot_mod.fetch_hot_scan()
+    r3 = {x["name"]: x for x in hot2["rising3"]["stocks"]}
+    check(hot2["rising3"]["ready"] is True, "连续3日：快照就绪（次日）")
+    check("甲科技" in r3 and "乙软件" in r3, "甲/乙连续3日排名上升（1<3<5 / 2<4<6）")
+    check("丙数据" not in r3 and "丁材料" not in r3, "丙/丁未连续3日上升（3<8<7 / 4<6<5）")
+    check(hot2["rising3"]["count"] == 2, "连续3日命中 2 只")
 
     print("== breakout 离线扫描 ==")
     em.fetch_long_kline = lambda code, limit=250: [dict(x) for x in BREAKOUT_KLINE_MAP.get(str(code), [])]
@@ -416,7 +440,7 @@ def main():
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot), ("breakout", bo)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)
