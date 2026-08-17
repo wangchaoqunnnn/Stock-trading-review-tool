@@ -309,13 +309,16 @@ def fetch_news():
     return out[:25]
 
 
-def fetch_spot_map(codes):
-    """批量获取个股实时行情（量比/换手/主力净流入等），返回 code -> 行情行。"""
+def fetch_spot_map(codes, fields="f2,f3,f6,f8,f10,f12,f14,f62"):
+    """批量获取个股实时行情，返回 code -> 行情行。
+
+    fields 可选：需要成交量(f5)时可传入扩展字段串（默认保持历史行为）。
+    """
     out = {}
     if not codes:
         return out
     secids = ",".join(("1." if c.startswith("6") else "0.") + c for c in codes)
-    params = {"fltt": 2, "invt": 2, "fields": "f2,f3,f6,f8,f10,f12,f14,f62", "secids": secids}
+    params = {"fltt": 2, "invt": 2, "fields": fields, "secids": secids}
     url = "https://push2delay.eastmoney.com/api/qt/ulist.np/get?" + urllib.parse.urlencode(params)
     try:
         data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})

@@ -27,6 +27,7 @@
     <button class="tab" data-tab="flow3" type="button">3日资金</button>
     <button class="tab" data-tab="trend3" type="button">放量阳线</button>
     <button class="tab" data-tab="limit20" type="button">涨停横盘</button>
+    <button class="tab" data-tab="ztpool" type="button">今日涨停</button>
   </nav>
 
   <main>
@@ -185,6 +186,33 @@
         </h2>
         <div id="l20Uptrend"></div>
         <div id="l20Sideways"></div>
+      </section>
+    </section>
+
+    <section id="page-ztpool" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="zpState" class="rt-state">加载中...</span></h2>
+        <div id="zpMarket"></div>
+      </section>
+      <section class="panel">
+        <h2>涨停 <span id="zpZtCount" class="sub"></span></h2>
+        <div id="zpZt"></div>
+      </section>
+      <section class="panel">
+        <h2>炸板 <span id="zpZbCount" class="sub"></span></h2>
+        <div id="zpZb"></div>
+      </section>
+      <section class="panel">
+        <h2>跌停 <span id="zpDtCount" class="sub"></span></h2>
+        <div id="zpDt"></div>
+      </section>
+      <section class="panel">
+        <h2>最高板 <span id="zpMaxCount" class="sub"></span></h2>
+        <div id="zpMax"></div>
+      </section>
+      <section class="panel">
+        <h2>竞价涨停（09:25 前封板） <span id="zpJjCount" class="sub"></span></h2>
+        <div id="zpJj"></div>
       </section>
     </section>
 

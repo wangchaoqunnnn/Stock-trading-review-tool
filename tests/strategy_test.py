@@ -201,6 +201,21 @@ def fake_ex_pool(path, date=None):
     return {"tc": d["tc"], "pool": [dict(x) for x in d["pool"]]}
 
 
+# ztpool 用：今日涨停/炸板/跌停池 + 行情补取
+FAKE_POOL_ZT = {"tc": 3, "pool": [
+    {"c": "600001", "n": "甲科技", "hybk": "半导体", "fbt": 92500, "lbc": 2, "zbc": 0, "fund": 1.0e8, "zdp": 10.0, "amount": 2.0e8},
+    {"c": "600002", "n": "乙软件", "hybk": "半导体", "fbt": 93000, "lbc": 1, "zbc": 0, "fund": 5.0e7, "zdp": 10.0, "amount": 1.5e8},
+    {"c": "300004", "n": "丙能源", "hybk": "新能源", "fbt": 101000, "lbc": 0, "zbc": 0, "fund": 2.0e7, "zdp": 19.9, "amount": 1.0e8},
+]}
+FAKE_POOL_ZB = {"tc": 1, "pool": [
+    {"c": "000005", "n": "丁银行", "hybk": "银行", "fbt": 94000, "lbc": 0, "zbc": 1, "fund": 3.0e7, "zdp": 8.0, "amount": 8.0e7},
+]}
+FAKE_POOL_DT = {"tc": 1, "pool": [
+    {"c": "601398", "n": "戊保险", "hybk": "保险", "fbt": 0, "lbc": 0, "zbc": 0, "fund": 0.0, "zdp": -9.9, "amount": 5.0e7},
+]}
+FAKE_SPOT_MAP = {c: {"f5": 1_000_000.0, "f10": 2.5, "f8": 12.0} for c in ("600001", "600002", "300004", "000005", "601398")}
+
+
 def patch_fetchers():
     em.fetch_industry_boards = lambda: [dict(x) for x in FAKE_BOARDS]
     em.fetch_concept_boards = lambda: [dict(x) for x in FAKE_CONCEPT]
@@ -305,11 +320,30 @@ def main():
     check("丁材料" in sw_stocks and "戊能源" in sw_stocks, "丁材料/戊能源=横盘震荡入选")
     check(d20["window_dates"][-1] == "2026-08-15", "统计窗口含当日")
 
+    print("== ztpool 离线扫描 ==")
+    em.fetch_zt_pool = lambda: {"tc": FAKE_POOL_ZT["tc"], "pool": [dict(x) for x in FAKE_POOL_ZT["pool"]]}
+    em.fetch_zb_pool = lambda: {"tc": FAKE_POOL_ZB["tc"], "pool": [dict(x) for x in FAKE_POOL_ZB["pool"]]}
+    em.fetch_dt_pool = lambda: {"tc": FAKE_POOL_DT["tc"], "pool": [dict(x) for x in FAKE_POOL_DT["pool"]]}
+    em.fetch_spot_map = lambda codes, fields="f2,f3,f6,f8,f10,f12,f14,f62": {c: dict(FAKE_SPOT_MAP[c]) for c in codes if c in FAKE_SPOT_MAP}
+    import stockreview.ztpool as ztpool_mod
+    ztpool_mod.datetime = FakeDT
+    zp = ztpool_mod.fetch_ztpool_detail()
+    check(zp["zt"]["count"] == 3 and zp["zt"]["stocks"][0]["name"] == "甲科技",
+          "涨停 3 只且按连板降序（甲科技2板在前）")
+    check(zp["zb"]["count"] == 1 and zp["zb"]["stocks"][0]["name"] == "丁银行", "炸板 1 只")
+    check(zp["dt"]["count"] == 1 and zp["dt"]["stocks"][0]["name"] == "戊保险", "跌停 1 只")
+    check(zp["max_board"]["max_lb"] == 2 and zp["max_board"]["count"] == 1, "最高2板（甲科技）")
+    check(zp["jingjia"]["count"] == 1 and zp["jingjia"]["stocks"][0]["name"] == "甲科技",
+          "竞价涨停 1 只（首封09:25:00<09:26）")
+    r = zp["zt"]["stocks"][0]
+    check(r["vol_wan"] == 100 and r["vol_ratio"] == 2.5 and r["amount_yi"] == 2.0 and r["industry"] == "半导体",
+          "行字段：量100万手/量比2.5/成交2.0亿/板块半导体")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

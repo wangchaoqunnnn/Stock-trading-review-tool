@@ -9,6 +9,7 @@ import { loadPullback } from "./pullback.js";
 import { loadFlow3 } from "./flow3.js";
 import { loadTrend3 } from "./trend3.js";
 import { loadLimit20 } from "./limit20.js";
+import { loadZtpool } from "./ztpool.js";
 
 // Tab -> 页面元素 id / 数据加载函数
 const PAGES = {
@@ -19,6 +20,7 @@ const PAGES = {
   flow3: "page-flow3",
   trend3: "page-trend3",
   limit20: "page-limit20",
+  ztpool: "page-ztpool",
 };
 const LOADERS = {
   daily: load,
@@ -28,6 +30,7 @@ const LOADERS = {
   flow3: loadFlow3,
   trend3: loadTrend3,
   limit20: loadLimit20,
+  ztpool: loadZtpool,
 };
 
 let activeTab = "daily";
