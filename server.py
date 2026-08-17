@@ -100,8 +100,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _serve(self, cache, date):
-        """统一服务入口：date 非空时走历史回放（不缓存），否则走实时缓存。"""
+    def _serve(self, cache, date, force=False):
+        """统一服务入口：date 非空时走历史回放（不缓存）；否则走缓存（force=强制刷新）。"""
         if date:
             try:
                 data = cache.fetcher(date)
@@ -112,7 +112,7 @@ class Handler(BaseHTTPRequestHandler):
                 }
             self._send_json(data)
         else:
-            self._send_json(cache.get())
+            self._send_json(cache.get(force=force))
 
     def _send_file(self, path, content_type):
         try:
@@ -138,56 +138,56 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(CACHE, date)
         elif path == "/api/version":
             self._send_json({"version": 2, "rt": True})
-        elif path == "/api/refresh":
-            self._serve(CACHE, date)
+        elif path == "/api/refresh" or path == "/api/snapshot_refresh":
+            self._serve(CACHE, date, force=True)
         elif path == "/api/realtime":
             self._serve(REALTIME_CACHE, date)
         elif path == "/api/realtime_refresh":
-            self._serve(REALTIME_CACHE, date)
+            self._serve(REALTIME_CACHE, date, force=True)
         elif path == "/api/volprice":
             self._serve(VOLPRICE_CACHE, date)
         elif path == "/api/volprice_refresh":
-            self._serve(VOLPRICE_CACHE, date)
+            self._serve(VOLPRICE_CACHE, date, force=True)
         elif path == "/api/pullback":
             self._serve(PULLBACK_CACHE, date)
         elif path == "/api/pullback_refresh":
-            self._serve(PULLBACK_CACHE, date)
+            self._serve(PULLBACK_CACHE, date, force=True)
         elif path == "/api/flow3":
             self._serve(FLOW3_CACHE, date)
         elif path == "/api/flow3_refresh":
-            self._serve(FLOW3_CACHE, date)
+            self._serve(FLOW3_CACHE, date, force=True)
         elif path == "/api/trend3":
             self._serve(TREND3_CACHE, date)
         elif path == "/api/trend3_refresh":
-            self._serve(TREND3_CACHE, date)
+            self._serve(TREND3_CACHE, date, force=True)
         elif path == "/api/limit20":
             self._serve(LIMIT20_CACHE, date)
         elif path == "/api/limit20_refresh":
-            self._serve(LIMIT20_CACHE, date)
+            self._serve(LIMIT20_CACHE, date, force=True)
         elif path == "/api/ztpool":
             self._serve(ZTPOOL_CACHE, date)
         elif path == "/api/ztpool_refresh":
-            self._serve(ZTPOOL_CACHE, date)
+            self._serve(ZTPOOL_CACHE, date, force=True)
         elif path == "/api/hot":
             self._serve(HOT_CACHE, date)
         elif path == "/api/hot_refresh":
-            self._serve(HOT_CACHE, date)
+            self._serve(HOT_CACHE, date, force=True)
         elif path == "/api/breakout":
             self._serve(BREAKOUT_CACHE, date)
         elif path == "/api/breakout_refresh":
-            self._serve(BREAKOUT_CACHE, date)
+            self._serve(BREAKOUT_CACHE, date, force=True)
         elif path == "/api/leaders":
             self._serve(LEADERS_CACHE, date)
         elif path == "/api/leaders_refresh":
-            self._serve(LEADERS_CACHE, date)
+            self._serve(LEADERS_CACHE, date, force=True)
         elif path == "/api/heatmap":
             self._serve(HEATMAP_CACHE, date)
         elif path == "/api/heatmap_refresh":
-            self._serve(HEATMAP_CACHE, date)
+            self._serve(HEATMAP_CACHE, date, force=True)
         elif path == "/api/emotion_history":
             self._serve(EMOTION_HISTORY_CACHE, date)
         elif path == "/api/emotion_history_refresh":
-            self._serve(EMOTION_HISTORY_CACHE, date)
+            self._serve(EMOTION_HISTORY_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:
