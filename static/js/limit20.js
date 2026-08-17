@@ -2,6 +2,19 @@
 
 import { $, esc, fmt, pctClass, signed } from "./utils.js";
 
+// 用户可选排序：字段 -> 比较器
+const SORTERS = {
+  amount: (a, b) => (b.amount_yi || 0) - (a.amount_yi || 0),               // 成交额 降序（默认）
+  days_since: (a, b) => (a.days_since || 0) - (b.days_since || 0),         // 距涨停 近的在前
+  pct_5d: (a, b) => (b.pct_5d ?? -999) - (a.pct_5d ?? -999),               // 近5日涨幅 降序
+  ma20: (a, b) => (b.ma20 || 0) - (a.ma20 || 0),                           // MA20 降序
+  vol_ratio: (a, b) => (b.vol_ratio || 0) - (a.vol_ratio || 0),            // 量比 降序
+  lbc: (a, b) => (b.lbc || 0) - (a.lbc || 0),                              // 连板数 降序
+  industry: (a, b) => String(a.industry || "").localeCompare(String(b.industry || ""), "zh"),  // 板块
+};
+
+let lastData = null;
+
 function l20MarketChips(d) {
   const m = d.market || {};
   const b = m.breadth || {};
@@ -35,12 +48,20 @@ function l20Table(rows) {
 }
 
 function renderLimit20(d) {
+  lastData = d;
   l20MarketChips(d);
+  const cmp = SORTERS[$("l20Sort").value] || SORTERS.amount;
+  const up = [...(d.uptrend_stocks || [])].sort(cmp);
+  const sw = [...(d.sideways_stocks || [])].sort(cmp);
   $("l20Summary").textContent = `统计窗口 ${(d.window_dates || []).length} 个交易日（${(d.window_dates || []).slice(-1)[0] || ""} ~ ${(d.window_dates || [])[0] || ""}）| 20日内封涨停 ${d.universe || 0} 只 → 上升趋势 ${d.uptrend_count || 0} / 横盘震荡 ${d.sideways_count || 0}`;
-  $("l20Uptrend").innerHTML = `<div class="subtitle">上升趋势（${d.uptrend_count || 0}）</div>` + l20Table(d.uptrend_stocks || []);
-  $("l20Sideways").innerHTML = `<div class="subtitle">横盘震荡（${d.sideways_count || 0}）</div>` + l20Table(d.sideways_stocks || []);
+  $("l20Uptrend").innerHTML = `<div class="subtitle">上升趋势（${d.uptrend_count || 0}）</div>` + l20Table(up);
+  $("l20Sideways").innerHTML = `<div class="subtitle">横盘震荡（${d.sideways_count || 0}）</div>` + l20Table(sw);
   $("l20State").textContent = "已更新 " + (d.as_of || "--");
 }
+
+$("l20Sort").addEventListener("change", () => {
+  if (lastData) renderLimit20(lastData);
+});
 
 export async function loadLimit20(force = false) {
   $("l20State").textContent = "更新中...";
