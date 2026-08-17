@@ -1,26 +1,27 @@
-/* ---------- 通用可排序表格：点击表头排序 ----------
+/* ---------- 通用可排序表格：点击表头排序（三态循环） ----------
  *
  * 用法：
- *   1. 定义表头：const HEADERS = [{key, label, align?, dir?}, ...]
- *      - key: 行对象字段名；align: "num" 右对齐；dir: 该列默认方向(1升/-1降)
+ *   1. 定义表头：const HEADERS = [{key, label, align?}, ...]
+ *      - key: 行对象字段名；align: "num" 右对齐
  *   2. 注册：registerSortable(groupId, HEADERS, () => renderXxx(lastData))
  *      - 点击表头后自动调用重渲染回调；同一 groupId 的多张表共享排序状态
  *   3. 渲染：表头用 sortableHead(groupId, HEADERS)，行数据用 sortableRows(groupId, rows)
  *
- * 行为：首次点击按该列默认方向排序，再次点击同列切换升/降序；
- * 当前排序列高亮并显示 ▲/▼；空值(null/undefined/"")统一排最后；
- * 数值按大小、字符串按中文拼音比较。
+ * 点击顺序（三态循环）：
+ *   第1下 → 从大到小（降序 ▼）
+ *   第2下 → 从小到大（升序 ▲）
+ *   第3下 → 默认顺序（服务端原始顺序，无箭头）
+ *   第4下 → 回到降序……
+ * 空值(null/undefined/"")恒排最后；数值按大小、字符串按中文拼音比较。
  */
 
-const groups = new Map();       // groupId -> {key, dir, defaultDir}
-const headersOf = new Map();    // groupId -> headers
+const groups = new Map();       // groupId -> {key, dir}
 const rerenders = new Map();    // groupId -> () => void
 
 export function registerSortable(groupId, headers, renderFn) {
-  headersOf.set(groupId, headers);
   rerenders.set(groupId, renderFn);
   if (!groups.has(groupId)) {
-    groups.set(groupId, { key: null, dir: -1, defaultDir: -1 });
+    groups.set(groupId, { key: null, dir: -1 });
   }
 }
 
@@ -55,7 +56,7 @@ export function sortableRows(groupId, rows) {
   });
 }
 
-// 全局点击委托：表头排序
+// 全局点击委托：表头排序（三态循环：降序 → 升序 → 默认顺序 → 循环）
 document.addEventListener("click", (e) => {
   const th = e.target.closest("th[data-sort-group]");
   if (!th) return;
@@ -63,12 +64,17 @@ document.addEventListener("click", (e) => {
   const key = th.dataset.sortKey;
   const st = groups.get(groupId);
   if (!st) return;
-  if (st.key === key) {
-    st.dir = -st.dir;
-  } else {
-    const def = (headersOf.get(groupId) || []).find((h) => h.key === key) || {};
+  if (st.key !== key) {
+    // 切换到新列：第一下 = 从大到小（降序）
     st.key = key;
-    st.dir = def.dir || 1;  // 未显式指定方向的列默认升序（字符串/日期/代码列更自然）
+    st.dir = -1;
+  } else if (st.dir === -1) {
+    // 同列第二下：从小到大（升序）
+    st.dir = 1;
+  } else {
+    // 同列第三下：恢复默认顺序（服务端原始顺序）
+    st.key = null;
+    st.dir = -1;
   }
   const fn = rerenders.get(groupId);
   if (fn) fn();
