@@ -64,15 +64,24 @@ $("l20Sort").addEventListener("change", () => {
 });
 
 export async function loadLimit20(force = false) {
-  $("l20State").textContent = "更新中...";
+  $("l20State").textContent = "更新中...（扫描全A约需1~2分钟）";
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 180000);
   try {
     const url = force ? "/api/limit20_refresh" : "/api/limit20";
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: ctrl.signal });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();
     renderLimit20(d);
   } catch (e) {
-    $("errors").textContent = "涨停横盘刷新失败：" + e.message;
-    $("l20State").textContent = "刷新失败";
+    if (e.name === "AbortError") {
+      $("errors").textContent = "涨停横盘扫描超时：数据源（腾讯/新浪K线）响应慢，请稍后点击「立即刷新」重试";
+      $("l20State").textContent = "扫描超时";
+    } else {
+      $("errors").textContent = "涨停横盘刷新失败：" + e.message;
+      $("l20State").textContent = "刷新失败";
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }

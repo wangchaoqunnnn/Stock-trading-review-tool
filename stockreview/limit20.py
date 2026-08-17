@@ -20,7 +20,7 @@ WINDOW_DAYS = 20
 # 日历日回溯上限（约覆盖 N 个交易日）
 MAX_CALENDAR_DAYS = 45
 # K线核对并发
-CHECK_WORKERS = 16
+CHECK_WORKERS = 24
 # 输出上限（每个状态列表）
 STOCK_LIMIT = 100
 

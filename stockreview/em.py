@@ -333,7 +333,8 @@ def fetch_kline_hist(code, limit=45):
     rows = []
     try:
         url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": f"{symbol},day,,,{limit},qfq"})
-        data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"})
+        # 腾讯源快速失败时重试意义不大，减为 2 次避免拖慢批量扫描
+        data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=2)
         node = (data.get("data") or {}).get(symbol) or {}
         rows = node.get("qfqday") or node.get("day") or []
     except Exception:
@@ -341,7 +342,7 @@ def fetch_kline_hist(code, limit=45):
     if not rows:
         try:
             url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": 45})
-            text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"})
+            text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"}, tries=2)
             m = re.search(r"\[(.*)\]", text, re.S)
             if m:
                 rows = json.loads("[" + m.group(1) + "]")

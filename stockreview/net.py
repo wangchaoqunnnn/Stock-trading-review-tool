@@ -24,9 +24,9 @@ def http_get(url, headers=None, decode="utf-8", timeout=18, tries=3):
             time.sleep(0.8)
 
 
-def http_get_json(url, headers=None):
+def http_get_json(url, headers=None, tries=3):
     """GET 请求并解析 JSON。"""
-    return json.loads(http_get(url, headers=headers))
+    return json.loads(http_get(url, headers=headers, tries=tries))
 
 
 def clist_url(fs, fields, fid="f3", po=1, pn=1, pz=100):
