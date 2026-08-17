@@ -46,6 +46,37 @@ body {
   font-size: 12px;
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+
+#asOf {
+  cursor: pointer;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+#asOf:hover {
+  border-color: var(--border);
+  background: #1a2130;
+}
+
+#asOf.hist {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.date-picker {
+  display: none;
+}
+
+.date-reset {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.date-reset.hidden {
+  display: none;
 }
 
 .actions { display: flex; gap: 8px; }

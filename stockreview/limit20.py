@@ -34,13 +34,13 @@ def _safe(name, fn):
         return name, {"error": f"{type(exc).__name__}: {exc}"}
 
 
-def collect_limit_pools(days=WINDOW_DAYS, max_calendar=MAX_CALENDAR_DAYS):
+def collect_limit_pools(days=WINDOW_DAYS, max_calendar=MAX_CALENDAR_DAYS, ref_date=None):
     """抓取最近 days 个交易日的历史涨停池，返回 (交易日列表, code -> 涨停信息)。
 
-    涨停信息保留最近一次涨停：limit_date(YYYYMMDD), name, industry, lbc。
+    ref_date: "YYYY-MM-DD" 时以该日为窗口终点（历史回放）。
     """
-    now = datetime.now()
-    calendar = [(now - timedelta(days=i)).strftime("%Y%m%d") for i in range(max_calendar)]
+    ref = datetime.strptime(ref_date, "%Y-%m-%d") if ref_date else datetime.now()
+    calendar = [(ref - timedelta(days=i)).strftime("%Y%m%d") for i in range(max_calendar)]
 
     def one(ds):
         try:
@@ -75,12 +75,12 @@ def collect_limit_pools(days=WINDOW_DAYS, max_calendar=MAX_CALENDAR_DAYS):
     return dates[-days:], pool_by_code
 
 
-def _classify_stock(row, info, date_index):
+def _classify_stock(row, info, date_index, end_date=None):
     """单只个股：K线分类当前状态，横盘/上升才返回结果。"""
     code = row.get("f12")
     if not code:
         return None
-    hist = em.fetch_kline_hist(str(code))
+    hist = em.fetch_kline_hist(str(code), end_date=end_date)
     if len(hist) < 25:
         return None
     state = classify_state(hist)
@@ -107,17 +107,19 @@ def _classify_stock(row, info, date_index):
     }
 
 
-def fetch_limit20_scan():
-    """20日涨停形态扫描主函数。"""
+def fetch_limit20_scan(date=None):
+    """20日涨停形态扫描主函数。date 非空时为历史回放（窗口终点为该日期）。"""
     errors = []
     with ThreadPoolExecutor(max_workers=8) as ex:
         futures = {
             "stocks": ex.submit(_safe, "stocks", lambda: net.fetch_paged(ALL_A_FS, SCAN_FIELDS, limit=6000)),
-            "pools": ex.submit(_safe, "pools", collect_limit_pools),
+            "pools": ex.submit(_safe, "pools", lambda: collect_limit_pools(ref_date=date)),
         }
         results = {k: f.result() for k, f in futures.items()}
         context = ex.submit(fetch_market_context).result()
     errors.extend(context["errors"])
+    if date:
+        errors.append(f"历史回放({date})：涨跌幅/量比/成交额为实时行情字段，形态判定基于该日期K线")
 
     stocks = results["stocks"][1] if not isinstance(results["stocks"], dict) else []
     dates, pool_by_code = results["pools"][1] if not isinstance(results["pools"], dict) else ([], {})
@@ -138,7 +140,7 @@ def fetch_limit20_scan():
         row = code_map.get(code)
         if row is None:
             return None
-        return _classify_stock(row, info, date_index)
+        return _classify_stock(row, info, date_index, date)
 
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
         hits = list(ex.map(classify, list(pool_by_code.keys())))

@@ -1,6 +1,6 @@
 /* ---------- 涨停回踩 ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const PB_BOARD_HEADERS = [
@@ -79,7 +79,7 @@ function renderPullback(d) {
 export async function loadPullback(force = false) {
   $("pbState").textContent = "更新中...";
   try {
-    const url = force ? "/api/pullback_refresh" : "/api/pullback";
+    const url = apiUrl("/api/pullback", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

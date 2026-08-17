@@ -1,6 +1,6 @@
 /* ---------- 实时盘口 ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { renderSignals, renderErrors } from "./daily.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
@@ -149,7 +149,7 @@ function renderRealtime(d) {
 export async function loadRealtime(force = false) {
   $("rtState").textContent = "更新中...";
   try {
-    const url = force ? "/api/realtime_refresh" : "/api/realtime";
+    const url = apiUrl("/api/realtime", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

@@ -12,8 +12,8 @@ from .utils import to_num
 SCAN_FIELDS = "f2,f3,f6,f8,f10,f12,f14,f15,f16,f17,f18,f22,f62,f184,f100"
 
 
-def fetch_volume_price_scan():
-    """量价异动扫描主函数。"""
+def fetch_volume_price_scan(date=None):
+    """量价异动扫描主函数。date 非空时为历史回放（K线截至该日期）。"""
     def safe(name, fn):
         try:
             return name, fn()
@@ -34,6 +34,8 @@ def fetch_volume_price_scan():
         results = {k: f.result() for k, f in futures.items()}
 
     errors = [str(v.get("error")) for v in results.values() if isinstance(v, dict) and "error" in v]
+    if date:
+        errors.append(f"历史回放({date})：量比/换手/成交额/主力为实时行情字段，量价分类基于该日期K线")
     stocks = results["stocks"][1] if not isinstance(results["stocks"], dict) else []
     industry = results["industry"][1] if not isinstance(results["industry"], dict) else []
     indices = results["indices"][1] if not isinstance(results["indices"], dict) else []
@@ -78,7 +80,7 @@ def fetch_volume_price_scan():
 
     def enrich(c):
         try:
-            hist = em.fetch_kline_hist(c["code"])
+            hist = em.fetch_kline_hist(c["code"], end_date=date)
         except Exception:
             hist = []
         if len(hist) >= 22:

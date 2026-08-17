@@ -1,6 +1,6 @@
 /* ---------- 市场热力图（行业板块涨跌色块 + 情绪周期表） ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 
 let lastData = null;
 let heatSort = "pct"; // 排序字段：pct 涨跌幅 / flow 主力资金
@@ -120,7 +120,7 @@ function renderEmotion(d) {
 
 async function loadEmotionHistory(force = false) {
   try {
-    const url = force ? "/api/emotion_history_refresh" : "/api/emotion_history";
+    const url = apiUrl("/api/emotion_history", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();
@@ -133,7 +133,7 @@ async function loadEmotionHistory(force = false) {
 export async function loadHeatmap(force = false) {
   $("hmState").textContent = "更新中...";
   try {
-    const url = force ? "/api/heatmap_refresh" : "/api/heatmap";
+    const url = apiUrl("/api/heatmap", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

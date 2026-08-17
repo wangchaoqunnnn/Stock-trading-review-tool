@@ -1,6 +1,6 @@
 /* ---------- 涨停横盘（20日内封涨停 + 横盘震荡/上升趋势） ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const L20_HEADERS = [
@@ -70,7 +70,7 @@ export async function loadLimit20(force = false) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 180000);
   try {
-    const url = force ? "/api/limit20_refresh" : "/api/limit20";
+    const url = apiUrl("/api/limit20", force);
     const resp = await fetch(url, { signal: ctrl.signal });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

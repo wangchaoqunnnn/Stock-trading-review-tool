@@ -329,13 +329,17 @@ def fetch_spot_map(codes, fields="f2,f3,f6,f8,f10,f12,f14,f62"):
     return out
 
 
-def fetch_kline_hist(code, limit=45):
-    """日K线历史：腾讯接口优先，新浪回退，东财再回退。"""
+def fetch_kline_hist(code, limit=45, end_date=None):
+    """日K线历史：腾讯接口优先，新浪回退，东财再回退。
+
+    end_date: "YYYY-MM-DD" 时返回截至该日期的K线（历史回放用）。
+    """
     prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
     symbol = prefix + code
     rows = []
     try:
-        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": f"{symbol},day,,,{limit},qfq"})
+        param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
+        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
         # 腾讯源快速失败时重试意义不大，减为 2 次避免拖慢批量扫描
         data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=2)
         node = (data.get("data") or {}).get(symbol) or {}
@@ -362,6 +366,8 @@ def fetch_kline_hist(code, limit=45):
                 date = row.get("day")
                 open_ = to_num(row.get("open")); close = to_num(row.get("close"))
                 high = to_num(row.get("high")); low = to_num(row.get("low")); volume = to_num(row.get("volume"))
+            if end_date and date and str(date) > end_date:
+                continue
             pct = 0.0
             if out:
                 prev_close = out[-1]["close"]
@@ -377,7 +383,8 @@ def fetch_kline_hist(code, limit=45):
             "secid": secid,
             "fields1": "f1,f2,f3,f4,f5,f6",
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-            "klt": 101, "fqt": 1, "beg": "20260701", "end": "20500101",
+            "klt": 101, "fqt": 1, "beg": "20260701",
+            "end": end_date.replace("-", "") if end_date else "20500101",
         }
         url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
         data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"})["data"]
@@ -408,32 +415,38 @@ def _parse_kline_list(rows):
     return out
 
 
-def fetch_long_kline(code, limit=250):
+def fetch_long_kline(code, limit=250, end_date=None):
     """长周期日K线（用于突破新高判定）。
 
     腾讯优先；东财 kline 动态回溯（约 limit 个交易日）次之；新浪 45 天兜底。
+    end_date: "YYYY-MM-DD" 时返回截至该日期的K线。
     """
     prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
     symbol = prefix + code
     try:
-        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": f"{symbol},day,,,{limit},qfq"})
+        param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
+        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
         data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=2)
         node = (data.get("data") or {}).get(symbol) or {}
         rows = node.get("qfqday") or node.get("day") or []
         out = _parse_kline_list(rows[-limit:])
+        if end_date:
+            out = [r for r in out if r["date"] <= end_date]
         if len(out) >= 25:
             return out
     except Exception:
         pass
     try:
         # 东财长历史：beg 按 limit 向前推（约 1.6 倍自然日）
-        beg = (datetime.now() - timedelta(days=int(limit * 1.6) + 30)).strftime("%Y%m%d")
+        ref = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+        beg = (ref - timedelta(days=int(limit * 1.6) + 30)).strftime("%Y%m%d")
         secid = ("1." if code.startswith("6") else "0.") + code
         params = {
             "secid": secid,
             "fields1": "f1,f2,f3,f4,f5,f6",
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-            "klt": 101, "fqt": 1, "beg": beg, "end": "20500101",
+            "klt": 101, "fqt": 1, "beg": beg,
+            "end": end_date.replace("-", "") if end_date else "20500101",
         }
         url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
         data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"}, tries=2)
@@ -454,6 +467,8 @@ def fetch_long_kline(code, limit=250):
         if m:
             rows = json.loads("[" + m.group(1) + "]")
             out = _parse_kline_list(rows)
+            if end_date:
+                out = [r for r in out if r["date"] <= end_date]
             if len(out) >= 25:
                 return out
     except Exception:
@@ -482,13 +497,13 @@ def fetch_fflow_daykline(secid, limit=0):
     return []
 
 
-def fetch_board_kline(code, limit=45):
-    """板块日K线（东财 kline 接口，secid=90.BKxxxx）。"""
+def fetch_board_kline(code, limit=45, end_date=None):
+    """板块日K线（东财 kline 接口，secid=90.BKxxxx）。end_date 支持历史回放。"""
     params = {
         "secid": "90." + code,
         "fields1": "f1,f2,f3,f4,f5,f6",
         "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-        "klt": 101, "fqt": 1, "end": "20500101", "lmt": limit,
+        "klt": 101, "fqt": 1, "end": end_date.replace("-", "") if end_date else "20500101", "lmt": limit,
     }
     for host in _history_hosts():
         try:
@@ -500,6 +515,63 @@ def fetch_board_kline(code, limit=45):
                 if len(p) < 11:
                     continue
                 out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
+            if end_date:
+                out = [r for r in out if r["date"] <= end_date]
+            if out:
+                _note_history_ok()
+                return out
+        except Exception:
+            _note_history_fail()
+            continue
+    return []
+
+
+def fetch_index_kline(secid, limit=45, end_date=None):
+    """指数日K线。腾讯优先（sh/sz/bj 前缀），东财兜底。返回 [{date, open, close, high, low, volume, amount, pct}]。"""
+    # 腾讯指数K线
+    try:
+        prefix = "sh" if secid.startswith("1.") else "sz" if secid.startswith("0.") else "bj"
+        symbol = prefix + secid.split(".")[1]
+        param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
+        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
+        data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=2)
+        node = (data.get("data") or {}).get(symbol) or {}
+        rows = node.get("qfqday") or node.get("day") or []
+        out = []
+        prev = None
+        for row in rows[-limit:]:
+            item = {"date": row[0], "open": to_num(row[1]), "close": to_num(row[2]),
+                    "high": to_num(row[3]), "low": to_num(row[4]), "volume": to_num(row[5]), "amount": 0.0}
+            item["pct"] = round((item["close"] / prev - 1) * 100, 2) if prev else 0.0
+            prev = item["close"]
+            out.append(item)
+        if end_date:
+            out = [r for r in out if r["date"] <= end_date]
+        if len(out) >= 2:
+            return out
+    except Exception:
+        pass
+    # 东财兜底
+    params = {
+        "secid": secid,
+        "fields1": "f1,f2,f3,f4,f5,f6",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+        "klt": 101, "fqt": 1, "beg": "20240101",
+        "end": end_date.replace("-", "") if end_date else "20500101",
+        "lmt": limit,
+    }
+    for host in _history_hosts():
+        try:
+            url = f"https://{host}/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
+            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"})
+            out = []
+            for line in (data.get("data") or {}).get("klines") or []:
+                p = line.split(",")
+                if len(p) < 11:
+                    continue
+                out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
+            if end_date:
+                out = [r for r in out if r["date"] <= end_date]
             if out:
                 _note_history_ok()
                 return out

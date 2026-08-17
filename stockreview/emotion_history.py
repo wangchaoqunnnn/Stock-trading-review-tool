@@ -57,10 +57,13 @@ def emotion_score(zt, zb, dt, breadth):
     }
 
 
-def _recent_trading_dates(days=DEFAULT_DAYS, max_calendar=MAX_CALENDAR_DAYS):
-    """扫描最近 max_calendar 个日历日，返回 tc>0 的最近 days 个交易日（YYYYMMDD，旧→新）。"""
-    now = datetime.now()
-    calendar = [(now - timedelta(days=i)).strftime("%Y%m%d") for i in range(max_calendar)]
+def _recent_trading_dates(days=DEFAULT_DAYS, max_calendar=MAX_CALENDAR_DAYS, ref_date=None):
+    """扫描最近 max_calendar 个日历日，返回 tc>0 的最近 days 个交易日（YYYYMMDD，旧→新）。
+
+    ref_date: "YYYY-MM-DD" 时以该日为终点（历史回放）。
+    """
+    ref = datetime.strptime(ref_date, "%Y-%m-%d") if ref_date else datetime.now()
+    calendar = [(ref - timedelta(days=i)).strftime("%Y%m%d") for i in range(max_calendar)]
 
     def one(ds):
         try:
@@ -92,12 +95,15 @@ def _day_data(ds):
     return zt, zb, dt, breadth
 
 
-def fetch_emotion_history(days=DEFAULT_DAYS):
-    """情绪周期表主函数：返回最近 days 个交易日的每日情绪数据（旧→新）。"""
+def fetch_emotion_history(date=None, days=DEFAULT_DAYS):
+    """情绪周期表主函数：返回最近 days 个交易日的每日情绪数据（旧→新）。
+
+    date 非空时为历史回放：以该日期为窗口终点（截至该日的 N 个交易日）。
+    """
     errors = []
     dates = []
     try:
-        dates = _recent_trading_dates(days)
+        dates = _recent_trading_dates(days, ref_date=date)
     except Exception as exc:
         errors.append(f"交易日历: {type(exc).__name__}: {exc}")
 

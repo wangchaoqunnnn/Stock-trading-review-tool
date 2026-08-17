@@ -1,6 +1,6 @@
 /* ---------- 龙头股（市场总龙 / 板块龙头 / 情绪龙头） ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const MARKET_HEADERS = [
@@ -92,7 +92,7 @@ function renderLeaders(d) {
 export async function loadLeaders(force = false) {
   $("ldState").textContent = "更新中...";
   try {
-    const url = force ? "/api/leaders_refresh" : "/api/leaders";
+    const url = apiUrl("/api/leaders", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

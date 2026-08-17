@@ -35,19 +35,24 @@ def _fmt_zt(x):
     }
 
 
-def fetch_leaders_scan():
-    """龙头股扫描主函数。"""
+def fetch_leaders_scan(date=None):
+    """龙头股扫描主函数。date 非空时为历史回放（涨停池按日期，人气榜为实时不可得）。"""
     errors = []
     pool = []
     hot_rows = []
     try:
-        pool = (em.fetch_zt_pool() or {}).get("pool") or []
+        if date:
+            pool = em.fetch_ex_pool("getTopicZTPool", date=date.replace("-", "")).get("pool") or []
+            errors.append(f"历史回放({date})：人气榜为实时数据源，历史模式下不可得")
+        else:
+            pool = (em.fetch_zt_pool() or {}).get("pool") or []
     except Exception as exc:
         errors.append(f"涨停池: {type(exc).__name__}: {exc}")
-    try:
-        hot_rows = fetch_hot_rank_list("day")
-    except Exception as exc:
-        errors.append(f"人气榜: {type(exc).__name__}: {exc}")
+    if not date:
+        try:
+            hot_rows = fetch_hot_rank_list("day")
+        except Exception as exc:
+            errors.append(f"人气榜: {type(exc).__name__}: {exc}")
 
     context = fetch_market_context()
     errors.extend(context["errors"])

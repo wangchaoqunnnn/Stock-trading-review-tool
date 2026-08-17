@@ -1,6 +1,6 @@
 /* ---------- 放量阳线（3日+ 连续小幅放量阳线、上升趋势） ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const T3_STOCK_HEADERS = [
@@ -79,7 +79,7 @@ function renderTrend3(d) {
 export async function loadTrend3(force = false) {
   $("t3State").textContent = "更新中...";
   try {
-    const url = force ? "/api/trend3_refresh" : "/api/trend3";
+    const url = apiUrl("/api/trend3", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

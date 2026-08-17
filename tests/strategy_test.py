@@ -265,8 +265,8 @@ def patch_fetchers():
     em.fetch_dt_pool = lambda: {"tc": 0, "pool": []}
     em.fetch_market_amount = lambda: 10000.5
     em.fetch_fflow_daykline = lambda secid, limit=0: list(FFLOW_MAP.get(secid, []))
-    em.fetch_kline_hist = lambda code, limit=45: [dict(x) for x in KLINE_MAP.get(str(code), [])]
-    em.fetch_board_kline = lambda code, limit=45: [dict(x) for x in KLINE_MAP.get(str(code), [])]
+    em.fetch_kline_hist = lambda code, limit=45, end_date=None: [dict(x) for x in KLINE_MAP.get(str(code), [])]
+    em.fetch_board_kline = lambda code, limit=45, end_date=None: [dict(x) for x in KLINE_MAP.get(str(code), [])]
     import stockreview.flow3 as flow3_mod
     import stockreview.trend3 as trend3_mod
     flow3_mod.datetime = FakeDT
@@ -334,7 +334,7 @@ def main():
 
     print("== limit20 离线扫描 ==")
     em.fetch_ex_pool = fake_ex_pool
-    em.fetch_kline_hist = lambda code, limit=45: [dict(x) for x in LIMIT20_KLINE_MAP.get(str(code), [])]
+    em.fetch_kline_hist = lambda code, limit=45, end_date=None: [dict(x) for x in LIMIT20_KLINE_MAP.get(str(code), [])]
 
     def limit20_stocks():
         rows = [dict(x) for x in FAKE_STOCKS]  # 600001/600002/600003
@@ -416,7 +416,7 @@ def main():
     check(hot2["rising3"]["count"] == 2, "连续3日命中 2 只")
 
     print("== breakout 离线扫描 ==")
-    em.fetch_long_kline = lambda code, limit=250: [dict(x) for x in BREAKOUT_KLINE_MAP.get(str(code), [])]
+    em.fetch_long_kline = lambda code, limit=250, end_date=None: [dict(x) for x in BREAKOUT_KLINE_MAP.get(str(code), [])]
     net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: [
         stock_row("600001", "甲科技", 5.0, 5.0e8, 1.8, 2.0e8),
         stock_row("600002", "乙软件", 3.0, 5.0e8, 1.5, 1.5e8),
@@ -485,7 +485,7 @@ def main():
     em.fetch_ex_pool = lambda path, date=None: fake_ex(date)
     em.fetch_breadth = lambda date=None: {"up": 3000, "down": 1000, "flat": 200}
     import stockreview.emotion_history as eh_mod
-    eh_mod._recent_trading_dates = lambda days=15, max_calendar=45: ["20260813", "20260814", "20260815"]
+    eh_mod._recent_trading_dates = lambda days=15, max_calendar=45, ref_date=None: ["20260813", "20260814", "20260815"]
     eh_mod.datetime = FakeDT
     eh = eh_mod.fetch_emotion_history(days=15)
     rows = {r["date"]: r for r in eh["rows"]}

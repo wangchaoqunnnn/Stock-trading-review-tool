@@ -1,7 +1,7 @@
 /* ---------- 应用入口：Tab 切换、自动刷新（带倒计时）、按钮事件 ---------- */
 
 import { $ } from "./utils.js";
-import { auto, toggleAuto } from "./state.js";
+import { auto, toggleAuto, selectedDate, setSelectedDate } from "./state.js";
 import { load } from "./daily.js";
 import { loadRealtime } from "./realtime.js";
 import { loadVolPrice } from "./volprice.js";
@@ -66,8 +66,43 @@ document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () 
 
 // 顶部刷新状态：倒计时显示（由本模块统一管理）
 function updateCountdown() {
+  if (selectedDate) {
+    $("refreshState").textContent = "历史模式（自动刷新暂停）";
+    return;
+  }
   $("refreshState").textContent = auto ? `自动刷新 ${countdown}s` : "已暂停自动刷新";
 }
+
+// 历史回放：点击"数据时间"选择日期，全站切换
+function applyHistoryMode() {
+  const picker = $("datePicker");
+  $("dateReset").classList.toggle("hidden", !selectedDate);
+  if (selectedDate) {
+    $("asOf").textContent = "历史：" + selectedDate;
+    $("asOf").classList.add("hist");
+    picker.value = selectedDate;
+  } else {
+    $("asOf").textContent = "数据时间";
+    $("asOf").classList.remove("hist");
+    picker.value = "";
+  }
+  updateCountdown();
+  refreshNow(true); // 全站（当前页）强制刷新到该日期
+}
+
+$("asOf").addEventListener("click", () => {
+  const picker = $("datePicker");
+  if (typeof picker.showPicker === "function") picker.showPicker();
+  else picker.focus();
+});
+$("datePicker").addEventListener("change", () => {
+  setSelectedDate($("datePicker").value || null);
+  applyHistoryMode();
+});
+$("dateReset").addEventListener("click", () => {
+  setSelectedDate(null);
+  applyHistoryMode();
+});
 
 // 统一刷新入口：手动/自动/初始化都走这里
 async function refreshNow(force = false) {
@@ -83,8 +118,12 @@ async function refreshNow(force = false) {
   }
 }
 
-// 每秒 tick：更新倒计时，归零时触发自动刷新
+// 每秒 tick：更新倒计时，归零时触发自动刷新（历史模式不自动刷新）
 function tick() {
+  if (selectedDate) {
+    updateCountdown();
+    return;
+  }
   if (!auto) {
     updateCountdown();
     return;

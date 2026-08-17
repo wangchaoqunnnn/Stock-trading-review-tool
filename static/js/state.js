@@ -10,3 +10,10 @@ export function toggleAuto() {
   auto = !auto;
   return auto;
 }
+
+// 历史回放日期（"YYYY-MM-DD"），null = 实时
+export let selectedDate = null;
+
+export function setSelectedDate(v) {
+  selectedDate = v || null;
+}

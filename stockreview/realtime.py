@@ -66,8 +66,21 @@ def fetch_watchlist_ticks(stocks):
 _RT_PREV = None
 
 
-def fetch_realtime():
-    """实时盘口聚合主函数。"""
+def fetch_realtime(date=None):
+    """实时盘口聚合主函数。
+
+    date 非空：分时/盘口数据源仅提供实时数据，不支持历史回放，返回空结构与提示。
+    """
+    if date:
+        return {
+            "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "rt": True,
+            "indices": [], "breadth": {}, "emotion": {},
+            "yesterday_zt": {}, "phase": time_phase(),
+            "signals": [], "industry_top": [], "industry_flow": [],
+            "concept_top_flow": [], "watchlist": [],
+            "errors": [f"历史回放({date})：实时盘口为分时数据源，不支持历史回放"],
+        }
     global _RT_PREV
 
     def safe(name, fn):

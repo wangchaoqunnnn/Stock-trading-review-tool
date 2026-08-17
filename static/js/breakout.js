@@ -1,6 +1,6 @@
 /* ---------- 突破新高（突破短期高点 / 突破历史高点） ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const BO_HEADERS = [
@@ -61,7 +61,7 @@ export async function loadBreakout(force = false) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 180000);
   try {
-    const url = force ? "/api/breakout_refresh" : "/api/breakout";
+    const url = apiUrl("/api/breakout", force);
     const resp = await fetch(url, { signal: ctrl.signal });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

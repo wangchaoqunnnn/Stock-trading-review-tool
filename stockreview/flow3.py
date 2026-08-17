@@ -33,9 +33,17 @@ def _safe(name, fn):
         return name, {"error": f"{type(exc).__name__}: {exc}"}
 
 
-def _board_flow(code, name, pct, flow_yi, amount_yi):
+def _fflow_rows(secid, date=None):
+    """抓取资金流历史并按 date 截取（date 非空时为历史回放）。"""
+    rows = parse_fflow_rows(em.fetch_fflow_daykline(secid))
+    if date:
+        rows = [r for r in rows if r["date"] <= date]
+    return rows
+
+
+def _board_flow(code, name, pct, flow_yi, amount_yi, date=None):
     """单个板块的资金流历史核对，返回命中结果 dict 或 None。"""
-    rows = parse_fflow_rows(em.fetch_fflow_daykline("90." + code))
+    rows = _fflow_rows("90." + code, date)
     if len(rows) < 3:
         return None
     inflow_days = trailing_inflow_days(rows)
@@ -57,13 +65,13 @@ def _board_flow(code, name, pct, flow_yi, amount_yi):
     return None
 
 
-def _stock_flow(row):
+def _stock_flow(row, date=None):
     """单只个股的资金流历史核对（仅净流入方向），命中返回结果 dict。"""
     code = row.get("f12")
     if not code:
         return None
     secid = ("1." if str(code).startswith("6") else "0.") + str(code)
-    rows = parse_fflow_rows(em.fetch_fflow_daykline(secid))
+    rows = _fflow_rows(secid, date)
     if len(rows) < 3:
         return None
     days = trailing_inflow_days(rows)
@@ -84,8 +92,8 @@ def _stock_flow(row):
     }
 
 
-def fetch_flow3_scan():
-    """3日以上资金流扫描主函数。"""
+def fetch_flow3_scan(date=None):
+    """3日以上资金流扫描主函数。date 非空时为历史回放（资金流历史截至该日期）。"""
     with ThreadPoolExecutor(max_workers=8) as ex:
         futures = {
             "industry": ex.submit(_safe, "industry", em.fetch_industry_boards),
@@ -96,6 +104,8 @@ def fetch_flow3_scan():
         context = ex.submit(fetch_market_context).result()
 
     errors = list(context["errors"])
+    if date:
+        errors.append(f"历史回放({date})：今日主力净流入为实时字段，资金流历史按该日期截取")
     industry = results["industry"][1] if not isinstance(results["industry"], dict) else []
     concept = results["concept"][1] if not isinstance(results["concept"], dict) else []
     stocks = results["stocks"][1] if not isinstance(results["stocks"], dict) else []
@@ -107,7 +117,7 @@ def fetch_flow3_scan():
     # ---- 板块 ----
     boards = industry + concept
     def check_board(b):
-        return _board_flow(b.get("code"), b.get("name"), b.get("pct"), b.get("flow_yi"), b.get("amount_yi"))
+        return _board_flow(b.get("code"), b.get("name"), b.get("pct"), b.get("flow_yi"), b.get("amount_yi"), date)
     with ThreadPoolExecutor(max_workers=12) as ex:
         board_results = list(ex.map(check_board, boards))
     board_hits = [x for x in board_results if x is not None]
@@ -121,7 +131,7 @@ def fetch_flow3_scan():
     stock_candidates.sort(key=lambda r: -to_num(r.get("f62")))
     stock_candidates = stock_candidates[:STOCK_CHECK_LIMIT]
     with ThreadPoolExecutor(max_workers=16) as ex:
-        stock_hits = list(ex.map(_stock_flow, stock_candidates))
+        stock_hits = list(ex.map(lambda r: _stock_flow(r, date), stock_candidates))
     inflow_stocks = sorted([x for x in stock_hits if x is not None],
                            key=lambda x: (-x["days"], -x["streak_flow_yi"]))[:120]
 

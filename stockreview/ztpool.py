@@ -54,18 +54,28 @@ def _by_fbt(r):
         return 999999
 
 
-def fetch_ztpool_detail():
-    """今日涨停面板主函数。"""
+def fetch_ztpool_detail(date=None):
+    """今日涨停面板主函数。date 非空时为历史回放（涨停池按日期，量比/成交量为实时字段不可得）。"""
     with ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {
-            "zt": ex.submit(_safe, "zt", em.fetch_zt_pool),
-            "zb": ex.submit(_safe, "zb", em.fetch_zb_pool),
-            "dt": ex.submit(_safe, "dt", em.fetch_dt_pool),
-        }
+        if date:
+            ds = date.replace("-", "")
+            futures = {
+                "zt": ex.submit(_safe, "zt", lambda: em.fetch_ex_pool("getTopicZTPool", date=ds)),
+                "zb": ex.submit(_safe, "zb", lambda: em.fetch_ex_pool("getTopicZBPool", date=ds)),
+                "dt": ex.submit(_safe, "dt", lambda: em.fetch_ex_pool("getTopicDTPool", date=ds)),
+            }
+        else:
+            futures = {
+                "zt": ex.submit(_safe, "zt", em.fetch_zt_pool),
+                "zb": ex.submit(_safe, "zb", em.fetch_zb_pool),
+                "dt": ex.submit(_safe, "dt", em.fetch_dt_pool),
+            }
         results = {k: f.result() for k, f in futures.items()}
         context = ex.submit(fetch_market_context).result()
 
     errors = list(context["errors"])
+    if date:
+        errors.append(f"历史回放({date})：量比/成交量/换手为实时行情字段，历史模式下不可得")
     zt = results["zt"][1] if not isinstance(results["zt"], dict) else {"tc": 0, "pool": []}
     zb = results["zb"][1] if not isinstance(results["zb"], dict) else {"tc": 0, "pool": []}
     dt = results["dt"][1] if not isinstance(results["dt"], dict) else {"tc": 0, "pool": []}
@@ -74,11 +84,13 @@ def fetch_ztpool_detail():
         if isinstance(v, dict) and "error" in v:
             errors.append(v["error"])
 
-    # 批量补取行情（量比/成交量/换手）
-    codes = set()
-    for pool in (zt, zb, dt):
-        codes.update(str(x.get("c")) for x in (pool.get("pool") or []))
-    spot_map = em.fetch_spot_map(sorted(codes), fields=SPOT_FIELDS)
+    # 实时模式才补取行情（量比/成交量/换手）；历史模式跳过
+    spot_map = {}
+    if not date:
+        codes = set()
+        for pool in (zt, zb, dt):
+            codes.update(str(x.get("c")) for x in (pool.get("pool") or []))
+        spot_map = em.fetch_spot_map(sorted(codes), fields=SPOT_FIELDS)
 
     zt_rows = _pool_rows(zt, spot_map)
     zb_rows = _pool_rows(zb, spot_map)

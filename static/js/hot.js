@@ -1,6 +1,6 @@
 /* ---------- 市场热度（热度排名TOP50 / 热度上升最快TOP50） ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const HOT_HEADERS = [
@@ -62,7 +62,7 @@ function renderHot(d) {
 export async function loadHot(force = false) {
   $("hotState").textContent = "更新中...";
   try {
-    const url = force ? "/api/hot_refresh" : "/api/hot";
+    const url = apiUrl("/api/hot", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

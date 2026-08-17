@@ -1,6 +1,6 @@
 /* ---------- 量价异动 ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const VP_BOARD_HEADERS = [
@@ -82,7 +82,7 @@ function renderVolPrice(d) {
 export async function loadVolPrice(force = false) {
   $("vpState").textContent = "更新中...";
   try {
-    const url = force ? "/api/volprice_refresh" : "/api/volprice";
+    const url = apiUrl("/api/volprice", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

@@ -1,6 +1,6 @@
 /* ---------- 今日涨停（涨停/炸板/跌停/最高板/竞价涨停） ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const ZP_HEADERS = [
@@ -72,7 +72,7 @@ function renderZtpool(d) {
 export async function loadZtpool(force = false) {
   $("zpState").textContent = "更新中...";
   try {
-    const url = force ? "/api/ztpool_refresh" : "/api/ztpool";
+    const url = apiUrl("/api/ztpool", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

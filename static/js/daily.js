@@ -1,6 +1,7 @@
 /* ---------- 每日复盘 ---------- */
 
-import { $, esc, fmt, pctClass, signed, toYi } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, toYi, apiUrl } from "./utils.js";
+import { selectedDate } from "./state.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const BOARD_HEADERS = [
@@ -206,12 +207,12 @@ function render(d) {
   renderZt(d);
   renderNews(d);
   renderErrors(d);
-  $("asOf").textContent = "数据时间 " + (d.as_of || "--");
+  $("asOf").textContent = selectedDate ? `历史：${selectedDate}` : "数据时间 " + (d.as_of || "--");
 }
 
 export async function load(force = false) {
   try {
-    const url = force ? "/api/refresh" : "/api/snapshot";
+    const url = apiUrl("/api/snapshot", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();

@@ -166,7 +166,7 @@ def fake_flow_top(po=1, pz=40):
     return FAKE_FLOW_IN if po == 1 else FAKE_FLOW_OUT
 
 
-def fake_kline(code):
+def fake_kline(code, limit=45, end_date=None):
     return list(FAKE_KLINES.get(code, []))
 
 

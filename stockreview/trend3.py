@@ -35,12 +35,12 @@ def _safe(name, fn):
         return name, {"error": f"{type(exc).__name__}: {exc}"}
 
 
-def _check_stock(row):
+def _check_stock(row, end_date=None):
     """单只个股：K线核对连续放量阳线 + 上升趋势。"""
     code = row.get("f12")
     if not code:
         return None
-    hist = em.fetch_kline_hist(str(code))
+    hist = em.fetch_kline_hist(str(code), end_date=end_date)
     if len(hist) < 25:
         return None
     days = yang_streak(hist)
@@ -61,12 +61,12 @@ def _check_stock(row):
     }
 
 
-def _check_board(b):
+def _check_board(b, end_date=None):
     """单只板块：K线核对连续放量阳线 + 上升趋势。"""
     code = b.get("code")
     if not code:
         return None
-    hist = em.fetch_board_kline(str(code))
+    hist = em.fetch_board_kline(str(code), end_date=end_date)
     if len(hist) < 25:
         return None
     days = yang_streak(hist)
@@ -84,8 +84,8 @@ def _check_board(b):
     }
 
 
-def fetch_trend3_scan():
-    """连续放量阳线扫描主函数。"""
+def fetch_trend3_scan(date=None):
+    """连续放量阳线扫描主函数。date 非空时为历史回放（K线截至该日期）。"""
     with ThreadPoolExecutor(max_workers=8) as ex:
         futures = {
             "industry": ex.submit(_safe, "industry", em.fetch_industry_boards),
@@ -96,6 +96,8 @@ def fetch_trend3_scan():
         context = ex.submit(fetch_market_context).result()
 
     errors = list(context["errors"])
+    if date:
+        errors.append(f"历史回放({date})：涨跌幅/量比/成交额为实时行情字段，形态判定基于该日期K线")
     industry = results["industry"][1] if not isinstance(results["industry"], dict) else []
     concept = results["concept"][1] if not isinstance(results["concept"], dict) else []
     stocks = results["stocks"][1] if not isinstance(results["stocks"], dict) else []
@@ -104,7 +106,7 @@ def fetch_trend3_scan():
         if isinstance(v, dict) and "error" in v:
             errors.append(v["error"])
 
-    # ---- 个股预筛：今日阳线 + 温和放量 + 流动性 ----
+    # ---- 个股预筛：今日阳线 + 温和放量 + 流动性（历史模式用实时行情近似） ----
     def pre_stock(r):
         pct = to_num(r.get("f3"))
         close = to_num(r.get("f2"))
@@ -120,7 +122,7 @@ def fetch_trend3_scan():
     stock_candidates.sort(key=lambda r: -to_num(r.get("f10")))
     stock_candidates = stock_candidates[:STOCK_CHECK_LIMIT]
     with ThreadPoolExecutor(max_workers=16) as ex:
-        stock_hits = list(ex.map(_check_stock, stock_candidates))
+        stock_hits = list(ex.map(lambda r: _check_stock(r, date), stock_candidates))
     stock_results = sorted([x for x in stock_hits if x is not None],
                            key=lambda x: (-x["days"], -x["pct_5d"] or 0))[:100]
 
@@ -131,7 +133,7 @@ def fetch_trend3_scan():
         return pct > 0 and PRE_VOL_MIN <= vr <= PRE_VOL_MAX
     board_candidates = [b for b in (industry + concept) if pre_board(b)]
     with ThreadPoolExecutor(max_workers=12) as ex:
-        board_hits = list(ex.map(_check_board, board_candidates))
+        board_hits = list(ex.map(lambda b: _check_board(b, date), board_candidates))
     board_results = sorted([x for x in board_hits if x is not None],
                            key=lambda x: (-x["days"], -x["pct_5d"] or 0))[:60]
 

@@ -122,8 +122,25 @@ def _compute_rising3(rows, history, today):
     return out, have_yesterday
 
 
-def fetch_hot_scan():
-    """市场热度扫描主函数：热度排名TOP50 + 热度上升最快TOP50 + 连续3日热度上升。"""
+def fetch_hot_scan(date=None):
+    """市场热度扫描主函数：热度排名TOP50 + 热度上升最快TOP50 + 连续3日热度上升。
+
+    date 非空：同花顺热股榜仅提供实时数据，不支持历史回放，返回空结构与提示。
+    """
+    if date:
+        context = fetch_market_context()
+        return {
+            "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "market": {
+                "indices": context["indices"], "breadth": context["breadth"],
+                "emotion": context["emotion"], "amount_yi": context["amount_yi"],
+            },
+            "source": "同花顺热股榜（A股日榜）",
+            "top": {"count": 0, "stocks": []},
+            "rising": {"count": 0, "stocks": []},
+            "rising3": {"count": 0, "days": RISING_DAYS, "days_available": 0, "ready": False, "stocks": []},
+            "errors": [f"历史回放({date})：同花顺热股榜为实时数据源，不支持历史回放"],
+        }
     errors = []
     rows = []
     try:

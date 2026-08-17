@@ -10,7 +10,9 @@
   <header class="topbar">
     <div class="brand">A股每日复盘</div>
     <div class="meta">
-      <span id="asOf">加载中...</span>
+      <span id="asOf" title="点击选择历史日期（回放该日数据）">加载中...</span>
+      <input type="date" id="datePicker" class="date-picker" title="选择历史日期，全站数据回放至该日" />
+      <button id="dateReset" type="button" class="date-reset hidden">回到实时</button>
       <span id="refreshState">自动刷新 30s</span>
     </div>
     <div class="actions">

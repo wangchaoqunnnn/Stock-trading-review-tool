@@ -1,6 +1,14 @@
 /* 通用工具函数 */
 
+import { selectedDate } from "./state.js";
+
 export const $ = (id) => document.getElementById(id);
+
+// 构造 API 地址：历史回放模式下附加 date 参数
+export function apiUrl(path, force) {
+  const base = path + (force ? "_refresh" : "");
+  return base + (selectedDate ? "?date=" + encodeURIComponent(selectedDate) : "");
+}
 
 export function esc(v) {
   return String(v == null ? "" : v)

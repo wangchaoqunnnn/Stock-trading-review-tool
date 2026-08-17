@@ -1,6 +1,6 @@
 /* ---------- 3日资金（连续净流入/流出） ---------- */
 
-import { $, esc, fmt, pctClass, signed } from "./utils.js";
+import { $, esc, fmt, pctClass, signed, apiUrl } from "./utils.js";
 import { registerSortable, sortableHead, sortableRows } from "./sortable.js";
 
 const F3_BOARD_HEADERS = [
@@ -78,7 +78,7 @@ function renderFlow3(d) {
 export async function loadFlow3(force = false) {
   $("f3State").textContent = "更新中...";
   try {
-    const url = force ? "/api/flow3_refresh" : "/api/flow3";
+    const url = apiUrl("/api/flow3", force);
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();
