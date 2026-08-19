@@ -570,6 +570,23 @@ def main():
     check(pma["ma5"]["count"] == 1 and pma["ma10"]["count"] == 1, "计数正确")
     check(m5["甲科技"]["ma"] > 0 and m5["甲科技"]["industry"] == "半导体", "均线值/板块字段")
 
+    print("== snapshot 放量额纯逻辑 ==")
+    import stockreview.snapshot as snap_mod
+    # 上证每分钟额：09:30=100亿, 09:31=50亿；深证：09:30=80亿, 09:31=30亿
+    em.fetch_amount_minutes = lambda secid, ndays=2: {
+        "2026-08-17": [("09:30", 1.0e10), ("09:31", 5.0e9)],
+        "2026-08-18": [("09:30", 1.5e10), ("09:31", 6.0e9)],
+    } if secid == "1.000001" else {
+        "2026-08-17": [("09:30", 8.0e9), ("09:31", 3.0e9)],
+        "2026-08-18": [("09:30", 1.2e10), ("09:31", 4.0e9)],
+    }
+    prev = snap_mod._prev_amount_at("2026-08-18 09:31")
+    check(prev == 260.0, f"昨日09:31累计成交额 260 亿（100+50+80+30），实际 {prev}")
+    prev2 = snap_mod._prev_amount_at("2026-08-18 09:30")
+    check(prev2 == 180.0, f"昨日09:30累计 180 亿，实际 {prev2}")
+    prev3 = snap_mod._prev_amount_at("2026-08-18 09:00")
+    check(prev3 is None, "开盘前返回 None")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map

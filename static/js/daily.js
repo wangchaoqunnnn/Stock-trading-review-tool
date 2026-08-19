@@ -84,6 +84,11 @@ function renderKpis(d) {
       <div class="sub">沪+深 东财口径</div>
     </div>
     <div class="kpi">
+      <div class="label">当前放量额</div>
+      <div class="value ${d.amount_diff_yi == null ? "" : pctClass(d.amount_diff_yi)}">${d.amount_diff_yi == null ? "--" : signed(d.amount_diff_yi, 2, "")}亿</div>
+      <div class="sub">较昨同刻 ${d.amount_diff_pct == null ? "--" : signed(d.amount_diff_pct)} · 昨同刻 ${d.amount_prev_yi == null ? "--" : fmt(d.amount_prev_yi)}亿</div>
+    </div>
+    <div class="kpi">
       <div class="label">上涨 / 下跌</div>
       <div class="value"><span class="up">${b.up || 0}</span> / <span class="down">${b.down || 0}</span></div>
       <div class="sub">平盘 ${b.flat || 0} 家</div>

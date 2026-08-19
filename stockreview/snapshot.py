@@ -7,6 +7,32 @@ from . import em
 from .analysis import build_signals, build_watchlist, compute_emotion, zt_summary
 
 
+def _prev_amount_at(now_str):
+    """前一交易日当前时刻的两市累计成交额（亿）。
+
+    now_str: "YYYY-MM-DD HH:MM"。使用指数分时（trends2 ndays=2）的
+    每分钟成交额，取昨日(前一交易日)截至当前时刻的累计。数据源不可达
+    （push2his 挂起）或开盘前返回 None。
+    """
+    day, hm = now_str[:10], now_str[11:16]
+    if hm < "09:30":
+        return None
+    total = 0.0
+    for secid in ("1.000001", "0.399001"):
+        days = em.fetch_amount_minutes(secid, ndays=2)
+        dates = sorted(d for d in days if d < day)
+        if not dates:
+            return None
+        y = dates[-1]
+        acc = 0.0
+        for tm, amt in days[y]:
+            acc += amt
+            if tm >= hm:
+                break
+        total += acc
+    return round(total / 100000000, 2)
+
+
 def fetch_snapshot(date=None):
     """每日复盘快照主函数。date 非空时为历史回放。
 
@@ -75,10 +101,21 @@ def fetch_snapshot(date=None):
         "flows": flows,
         "news": news,
     }
+    # 当前放量额：与前一日当前时刻成交额对比（盘中实时口径）
+    amount_prev = _prev_amount_at(datetime.now().strftime("%Y-%m-%d %H:%M"))
+    if amount is not None and amount_prev:
+        amount_diff = round(amount - amount_prev, 2)
+        amount_diff_pct = round((amount / amount_prev - 1) * 100, 2)
+    else:
+        amount_diff = None
+        amount_diff_pct = None
     return {
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "indices": indices,
         "amount_yi": amount,
+        "amount_prev_yi": amount_prev,
+        "amount_diff_yi": amount_diff,
+        "amount_diff_pct": amount_diff_pct,
         "breadth": breadth,
         "emotion": emotion,
         "zt_summary": zts,
@@ -175,6 +212,9 @@ def _fetch_snapshot_history(date, safe):
         "history_date": date,
         "indices": indices,
         "amount_yi": None,
+        "amount_prev_yi": None,
+        "amount_diff_yi": None,
+        "amount_diff_pct": None,
         "breadth": ctx["breadth"],
         "emotion": emotion,
         "zt_summary": zts,

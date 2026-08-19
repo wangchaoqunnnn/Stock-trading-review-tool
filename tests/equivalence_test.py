@@ -279,6 +279,7 @@ def patch_new(em, net, realtime, snapshot, volprice, pullback):
     """把重构版各模块的网络函数替换为同一套离线假数据。"""
     em.fetch_indices = lambda: [dict(x) for x in FAKE_INDICES]
     em.fetch_market_amount = lambda: 12000.5
+    em.fetch_amount_minutes = lambda secid, ndays=2: {}  # 离线：昨日分时不可得
     em.fetch_breadth = lambda: dict(FAKE_BREADTH)
     em.fetch_zt_pool = lambda: {"tc": FAKE_ZT["tc"], "pool": [dict(x) for x in FAKE_ZT["pool"]]}
     em.fetch_zb_pool = lambda: {"tc": FAKE_ZB["tc"], "pool": [dict(x) for x in FAKE_ZB["pool"]]}
@@ -381,7 +382,12 @@ def main():
     print("  ✓ evaluate_pullback 命中与评分")
 
     print("\n== 完整聚合等价性（离线假数据） ==")
-    assert_equal("fetch_snapshot", orig.fetch_snapshot(), snapshot.fetch_snapshot())
+    # fetch_snapshot 新增"当前放量额"字段（原版无此功能），给原版结果补 None 对齐后比较
+    orig_snap = orig.fetch_snapshot()
+    new_snap = snapshot.fetch_snapshot()
+    for k in ("amount_prev_yi", "amount_diff_yi", "amount_diff_pct"):
+        orig_snap.setdefault(k, None)
+    assert_equal("fetch_snapshot", orig_snap, new_snap)
     assert_equal("fetch_realtime(第1次)", orig.fetch_realtime(), realtime.fetch_realtime())
     assert_equal("fetch_realtime(第2次/环比)", orig.fetch_realtime(), realtime.fetch_realtime())
     assert_equal("fetch_volume_price_scan", orig.fetch_volume_price_scan(), volprice.fetch_volume_price_scan())

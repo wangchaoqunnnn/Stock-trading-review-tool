@@ -329,6 +329,38 @@ def fetch_spot_map(codes, fields="f2,f3,f6,f8,f10,f12,f14,f62"):
     return out
 
 
+def fetch_amount_minutes(secid, ndays=2):
+    """指数分时每分钟成交额（trends2 行[6]），按日期分组。
+
+    返回 {date: [(HH:MM, 每分钟成交额元), ...]}。push2his 优先（支持多日），
+    push2delay 兜底（通常仅当日）。
+    """
+    params = {
+        "secid": secid,
+        "ut": INDEX_UT,
+        "fields1": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
+        "iscr": 0, "iscca": 1, "ndays": ndays,
+    }
+    for host in ("push2his.eastmoney.com", "push2delay.eastmoney.com"):
+        try:
+            url = f"https://{host}/api/qt/stock/trends2/get?" + urllib.parse.urlencode(params)
+            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})
+            trends = (data.get("data") or {}).get("trends") or []
+            out = {}
+            for t in trends:
+                p = t.split(",")
+                if len(p) < 7:
+                    continue
+                day, tm = p[0][:10], p[0][11:16]
+                out.setdefault(day, []).append((tm, to_num(p[6])))
+            if out:
+                return out
+        except Exception:
+            continue
+    return {}
+
+
 def fetch_kline_hist(code, limit=45, end_date=None):
     """日K线历史：腾讯接口优先，新浪回退，东财再回退。
 
