@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from . import em, net
-from .analysis import is_uptrend, ma_of, pullback_to_ma
+from .analysis import is_uptrend, ma_of, pullback_to_ma, vol_shrink_ratio
 from .config import ALL_A_FS
 from .market import fetch_market_context
 from .utils import to_num
@@ -49,6 +49,7 @@ def _check_stock(row, end_date=None):
         "ma5": round(ma_of(hist, 5), 2),
         "ma10": round(ma_of(hist, 10), 2),
         "ma20": round(ma_of(hist, 20), 2),
+        "vol_shrink": round(vol_shrink_ratio(hist, 5), 2) if vol_shrink_ratio(hist, 5) is not None else None,
         "vol_ratio": round(to_num(row.get("f10")), 2),
         "amount_yi": round(to_num(row.get("f6")) / 100000000, 2),
         "turnover": round(to_num(row.get("f8")), 2),

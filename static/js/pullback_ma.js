@@ -14,6 +14,7 @@ const PMA_HEADERS = [
   { key: "ma5", label: "MA5", align: "num", dir: -1 },
   { key: "ma10", label: "MA10", align: "num", dir: -1 },
   { key: "ma20", label: "MA20", align: "num", dir: -1 },
+  { key: "vol_shrink", label: "量能(今/5日均)", align: "num", dir: 1 },
   { key: "vol_ratio", label: "量比", align: "num", dir: -1 },
   { key: "amount_yi", label: "成交(亿)", align: "num", dir: -1 },
   { key: "industry", label: "板块" },
@@ -44,6 +45,7 @@ function pmaTable(groupId, rows) {
       <td class="num">${fmt(r.ma5)}</td>
       <td class="num">${fmt(r.ma10)}</td>
       <td class="num">${fmt(r.ma20)}</td>
+      <td class="num">${r.vol_shrink == null ? "--" : fmt(r.vol_shrink)}</td>
       <td class="num">${fmt(r.vol_ratio)}</td>
       <td class="num">${fmt(r.amount_yi)}</td>
       <td>${esc(r.industry || "--")}</td>

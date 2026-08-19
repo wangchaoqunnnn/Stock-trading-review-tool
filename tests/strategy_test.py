@@ -525,50 +525,64 @@ def main():
 
     print("== pullback_ma 离线扫描 ==")
     from stockreview.analysis import pullback_to_ma
-    up_hist = build_kline(n=40, streak=3, base=10.0)  # 上升趋势
+    up_hist = build_kline(n=40, streak=3, base=10.0)  # 上升趋势（最后3天放量）
     check(analysis.is_uptrend(up_hist) is True, "回踩K线为上升趋势")
     ma5v = analysis.ma_of(up_hist, 5)
     ma10v = analysis.ma_of(up_hist, 10)
-    # 甲：今日低点触及 MA10（更低）→ 回踩5日+10日均命中
-    touch_hist = [dict(x) for x in up_hist]
+
+    def shrink_last(rows, vol=0.7e6):
+        r = [dict(x) for x in rows]
+        r[-1]["volume"] = vol  # 今日缩量（前5日均量约1.2e6 → 比值0.58 < 0.9）
+        return r
+
+    # 甲：缩量回踩（低点触及 MA10）→ 回踩5日+10日均命中
+    touch_hist = shrink_last(up_hist)
     touch_hist[-1]["low"] = ma10v * 0.999
     ok5, ma5r = pullback_to_ma(touch_hist, 5)
-    check(ok5 is True and ma5r is not None, "回踩5日均线命中")
+    check(ok5 is True and ma5r is not None, "缩量回踩5日均线命中")
     ok10, ma10r = pullback_to_ma(touch_hist, 10)
-    check(ok10 is True, "回踩10日均线也命中（低点触及MA10）")
-    # 乙：低点远离均线 → 未回踩
-    far_hist = [dict(x) for x in up_hist]
+    check(ok10 is True, "缩量回踩10日均线也命中（低点触及MA10）")
+    # 乙：缩量但低点远离均线 → 未回踩
+    far_hist = shrink_last(up_hist)
     far_hist[-1]["low"] = ma5v * 1.03
     ok_far, _ = pullback_to_ma(far_hist, 5)
     check(ok_far is False, "低点远离均线不命中")
-    # 丙：收盘明显跌破均线 → 不命中
-    break_hist = [dict(x) for x in up_hist]
+    # 丙：缩量但收盘明显跌破均线 → 不命中
+    break_hist = shrink_last(up_hist)
     break_hist[-1]["low"] = ma5v * 0.98
     break_hist[-1]["close"] = ma5v * 0.97
     ok_br, _ = pullback_to_ma(break_hist, 5)
     check(ok_br is False, "收盘明显跌破不命中")
+    # 丁：回踩但放量（今日量 ≥ 前5日均量90%）→ 缩量条件不满足
+    vol_high_hist = [dict(x) for x in up_hist]
+    vol_high_hist[-1]["low"] = ma10v * 0.999  # 触及均线
+    ok_vh, _ = pullback_to_ma(vol_high_hist, 5)
+    check(ok_vh is False, "放量回踩不命中（需缩量）")
 
     PMA_KLINE_MAP = {
-        "600001": touch_hist,   # 回踩5日+10日
-        "600002": far_hist,     # 未回踩
-        "600003": break_hist,   # 跌破（且预筛涨幅-8%排除）
+        "600001": touch_hist,       # 缩量回踩5日+10日
+        "600002": far_hist,         # 未回踩
+        "600003": break_hist,       # 跌破（且预筛涨幅-8%排除）
+        "600004": vol_high_hist,    # 放量回踩 → 不命中
     }
     em.fetch_kline_hist = lambda code, limit=45, end_date=None: [dict(x) for x in PMA_KLINE_MAP.get(str(code), [])]
     net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: [
         stock_row("600001", "甲科技", 2.0, 5.0e8, 1.2, 1.0e8),
         stock_row("600002", "乙软件", 1.0, 5.0e8, 1.0, 1.0e8),
         stock_row("600003", "丙数据", -8.0, 5.0e8, 1.0, 1.0e8),   # 涨幅-8%超预筛下限 → 排除
+        stock_row("600004", "丁材料", 1.5, 5.0e8, 1.1, 1.0e8),    # 放量回踩 → 不命中
     ]
     import stockreview.pullback_ma as pma_mod
     pma_mod.datetime = FakeDT
     pma = pma_mod.fetch_pullback_ma_scan()
     m5 = {x["name"]: x for x in pma["ma5"]["stocks"]}
     m10 = {x["name"]: x for x in pma["ma10"]["stocks"]}
-    check("甲科技" in m5 and "甲科技" in m10, "甲科技回踩5日+10日均线均入选")
+    check("甲科技" in m5 and "甲科技" in m10, "甲科技缩量回踩5日+10日均线均入选")
     check("乙软件" not in m5 and "乙软件" not in m10, "乙软件未回踩不入选")
     check("丙数据" not in m5, "丙数据预筛排除（-8%超下限）")
+    check("丁材料" not in m5 and "丁材料" not in m10, "丁材料放量回踩不入选（需缩量）")
     check(pma["ma5"]["count"] == 1 and pma["ma10"]["count"] == 1, "计数正确")
-    check(m5["甲科技"]["ma"] > 0 and m5["甲科技"]["industry"] == "半导体", "均线值/板块字段")
+    check(m5["甲科技"]["ma"] > 0 and m5["甲科技"]["vol_shrink"] < 0.9, "均线值/缩量比值字段（<0.9）")
 
     print("== snapshot 放量额纯逻辑 ==")
     import stockreview.snapshot as snap_mod
