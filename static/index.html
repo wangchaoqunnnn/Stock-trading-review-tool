@@ -34,6 +34,7 @@
     <button class="tab" data-tab="breakout" type="button">突破新高</button>
     <button class="tab" data-tab="leaders" type="button">龙头股</button>
     <button class="tab" data-tab="heatmap" type="button">市场情绪</button>
+    <button class="tab" data-tab="speedrank" type="button">涨速榜</button>
   </nav>
 
   <main>
@@ -295,6 +296,18 @@
           <button type="button" class="heat-sort" data-sort="flow">按主力资金</button>
         </div>
         <div id="hmBoards" class="heat-grid"></div>
+      </section>
+    </section>
+
+    <section id="page-speedrank" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="srState" class="rt-state">加载中...</span></h2>
+        <div id="srMarket"></div>
+        <div id="srSummary"></div>
+      </section>
+      <section class="panel">
+        <h2>涨速榜 TOP100 <span class="sub">按即时涨速排名；3分钟/5分钟涨速由分时数据计算 · 每30s自动刷新</span></h2>
+        <div id="srList"></div>
       </section>
     </section>
 

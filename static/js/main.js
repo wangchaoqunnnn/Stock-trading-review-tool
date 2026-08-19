@@ -14,6 +14,7 @@ import { loadHot } from "./hot.js";
 import { loadBreakout } from "./breakout.js";
 import { loadLeaders } from "./leaders.js";
 import { loadHeatmap } from "./heatmap.js";
+import { loadSpeedRank } from "./speedrank.js";
 
 // Tab -> 页面元素 id / 数据加载函数
 const PAGES = {
@@ -29,6 +30,7 @@ const PAGES = {
   breakout: "page-breakout",
   leaders: "page-leaders",
   heatmap: "page-heatmap",
+  speedrank: "page-speedrank",
 };
 const LOADERS = {
   daily: load,
@@ -43,6 +45,7 @@ const LOADERS = {
   breakout: loadBreakout,
   leaders: loadLeaders,
   heatmap: loadHeatmap,
+  speedrank: loadSpeedRank,
 };
 
 const REFRESH_INTERVAL = 30; // 自动刷新周期（秒）

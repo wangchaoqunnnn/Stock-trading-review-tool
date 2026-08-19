@@ -498,11 +498,36 @@ def main():
     check(emotion_level(80) == "亢奋" and emotion_level(50) == "中性" and emotion_level(10) == "冰点",
           "情绪等级划分正确")
 
+    print("== speedrank 离线扫描 ==")
+    em.fetch_breadth = lambda date=None: dict(FAKE_BREADTH)  # 恢复完整涨跌分布（emotion_history 覆盖过）
+    import stockreview.speedrank as speedrank_mod
+    speedrank_mod._intraday_closes = lambda code: {
+        "600001": [10.0, 10.1, 10.2, 10.3, 10.4, 10.5],     # 3分=(10.5/10.2-1)=2.94, 5分=(10.5/10.0-1)=5.0
+        "600002": [9.0, 9.0, 9.0, 9.0, 9.0, 9.0],
+        "600003": [8.0, 7.9, 7.8, 7.7, 7.6, 7.5],
+    }.get(code, [])
+    net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: [
+        {"f12": "600001", "f14": "甲科技", "f2": 10.5, "f3": 3.0, "f6": 5.0e8, "f8": 10.0, "f10": 2.0, "f22": 1.5, "f62": 1.0e8, "f100": "半导体"},
+        {"f12": "600002", "f14": "乙软件", "f2": 9.0, "f3": 2.0, "f6": 4.0e8, "f8": 8.0, "f10": 1.5, "f22": 0.8, "f62": 5.0e7, "f100": "软件"},
+        {"f12": "600003", "f14": "丙数据", "f2": 8.0, "f3": 1.0, "f6": 3.0e8, "f8": 6.0, "f10": 1.2, "f22": 0.5, "f62": 2.0e7, "f100": "算力"},
+    ]
+    speedrank_mod.datetime = FakeDT
+    sr = speedrank_mod.fetch_speedrank_scan()
+    smap = {x["name"]: x for x in sr["stocks"]}
+    check(len(sr["stocks"]) == 3, "涨速榜 3 只")
+    check(smap["甲科技"]["speed3"] == 2.94 and smap["甲科技"]["speed5"] == 5.0,
+          "甲科技 3分钟涨速2.94%/5分钟涨速5.0% 计算正确")
+    check(smap["甲科技"]["speed"] == 1.5 and smap["甲科技"]["industry"] == "半导体", "即时涨速/板块字段")
+    check(sr["stocks"][0]["name"] == "甲科技", "按3分钟涨速降序（甲居首）")
+    check(smap["丙数据"]["speed3"] == -3.85, "丙数据 3分钟涨速为负（下跌）")
+    sr_h = speedrank_mod.fetch_speedrank_scan(date="2026-08-14")
+    check(sr_h["stocks"] == [] and any("不支持历史回放" in e for e in sr_h["errors"]), "历史模式：标注不支持")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)
