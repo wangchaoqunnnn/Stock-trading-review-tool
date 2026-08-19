@@ -523,11 +523,58 @@ def main():
     sr_h = speedrank_mod.fetch_speedrank_scan(date="2026-08-14")
     check(sr_h["stocks"] == [] and any("不支持历史回放" in e for e in sr_h["errors"]), "历史模式：标注不支持")
 
+    print("== pullback_ma 离线扫描 ==")
+    from stockreview.analysis import pullback_to_ma
+    up_hist = build_kline(n=40, streak=3, base=10.0)  # 上升趋势
+    check(analysis.is_uptrend(up_hist) is True, "回踩K线为上升趋势")
+    ma5v = analysis.ma_of(up_hist, 5)
+    ma10v = analysis.ma_of(up_hist, 10)
+    # 甲：今日低点触及 MA10（更低）→ 回踩5日+10日均命中
+    touch_hist = [dict(x) for x in up_hist]
+    touch_hist[-1]["low"] = ma10v * 0.999
+    ok5, ma5r = pullback_to_ma(touch_hist, 5)
+    check(ok5 is True and ma5r is not None, "回踩5日均线命中")
+    ok10, ma10r = pullback_to_ma(touch_hist, 10)
+    check(ok10 is True, "回踩10日均线也命中（低点触及MA10）")
+    # 乙：低点远离均线 → 未回踩
+    far_hist = [dict(x) for x in up_hist]
+    far_hist[-1]["low"] = ma5v * 1.03
+    ok_far, _ = pullback_to_ma(far_hist, 5)
+    check(ok_far is False, "低点远离均线不命中")
+    # 丙：收盘明显跌破均线 → 不命中
+    break_hist = [dict(x) for x in up_hist]
+    break_hist[-1]["low"] = ma5v * 0.98
+    break_hist[-1]["close"] = ma5v * 0.97
+    ok_br, _ = pullback_to_ma(break_hist, 5)
+    check(ok_br is False, "收盘明显跌破不命中")
+
+    PMA_KLINE_MAP = {
+        "600001": touch_hist,   # 回踩5日+10日
+        "600002": far_hist,     # 未回踩
+        "600003": break_hist,   # 跌破（且预筛涨幅-8%排除）
+    }
+    em.fetch_kline_hist = lambda code, limit=45, end_date=None: [dict(x) for x in PMA_KLINE_MAP.get(str(code), [])]
+    net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: [
+        stock_row("600001", "甲科技", 2.0, 5.0e8, 1.2, 1.0e8),
+        stock_row("600002", "乙软件", 1.0, 5.0e8, 1.0, 1.0e8),
+        stock_row("600003", "丙数据", -8.0, 5.0e8, 1.0, 1.0e8),   # 涨幅-8%超预筛下限 → 排除
+    ]
+    import stockreview.pullback_ma as pma_mod
+    pma_mod.datetime = FakeDT
+    pma = pma_mod.fetch_pullback_ma_scan()
+    m5 = {x["name"]: x for x in pma["ma5"]["stocks"]}
+    m10 = {x["name"]: x for x in pma["ma10"]["stocks"]}
+    check("甲科技" in m5 and "甲科技" in m10, "甲科技回踩5日+10日均线均入选")
+    check("乙软件" not in m5 and "乙软件" not in m10, "乙软件未回踩不入选")
+    check("丙数据" not in m5, "丙数据预筛排除（-8%超下限）")
+    check(pma["ma5"]["count"] == 1 and pma["ma10"]["count"] == 1, "计数正确")
+    check(m5["甲科技"]["ma"] > 0 and m5["甲科技"]["industry"] == "半导体", "均线值/板块字段")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

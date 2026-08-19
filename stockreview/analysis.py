@@ -395,6 +395,31 @@ STATE_LABELS = {"uptrend": "上升趋势", "sideways": "横盘震荡", "downtren
 
 # ---------- 突破新高判定 ----------
 
+def ma_of(hist, n):
+    """最近 n 日均线（收盘价）。数据不足返回 None。"""
+    if len(hist) < n:
+        return None
+    return sum(h["close"] for h in hist[-n:]) / n
+
+
+def pullback_to_ma(hist, n, touch=0.005, floor=0.985):
+    """上升趋势中回踩 n 日均线：盘中最低触及均线附近，收盘未明显跌破。
+
+    返回 (是否回踩, 均线值)；非上升趋势或数据不足返回 (None, None)。
+    touch: 最低价相对均线的触及容忍（1+0.5% 内算触及）
+    floor: 收盘相对均线的最低容忍（跌破 1.5% 以上不算回踩支撑）
+    """
+    if len(hist) < max(n, 25) or not is_uptrend(hist):
+        return None, None
+    ma = ma_of(hist, n)
+    if not ma or ma <= 0:
+        return None, None
+    today = hist[-1]
+    if today["low"] <= ma * (1 + touch) and today["close"] >= ma * floor:
+        return True, ma
+    return False, ma
+
+
 def breakout_short(hist, days=20):
     """突破近 days 日最高价。
 

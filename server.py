@@ -25,6 +25,7 @@ from stockreview.hot import fetch_hot_scan
 from stockreview.leaders import fetch_leaders_scan
 from stockreview.limit20 import fetch_limit20_scan
 from stockreview.pullback import fetch_pullback_scan
+from stockreview.pullback_ma import fetch_pullback_ma_scan
 from stockreview.realtime import fetch_realtime
 from stockreview.snapshot import fetch_snapshot
 from stockreview.speedrank import fetch_speedrank_scan
@@ -56,6 +57,8 @@ HEATMAP_CACHE = SnapshotCache(ttl=60, fetcher=fetch_heatmap_scan)
 EMOTION_HISTORY_CACHE = SnapshotCache(ttl=600, fetcher=fetch_emotion_history)
 # 涨速榜：盘中实时口径，30s 缓存（配合前端 30s 自动刷新）
 SPEEDRANK_CACHE = SnapshotCache(ttl=30, fetcher=fetch_speedrank_scan)
+# 回踩支撑：K线核对较慢，10 分钟缓存
+PULLBACK_MA_CACHE = SnapshotCache(ttl=600, fetcher=fetch_pullback_ma_scan)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -195,6 +198,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(SPEEDRANK_CACHE, date)
         elif path == "/api/speedrank_refresh":
             self._serve(SPEEDRANK_CACHE, date, force=True)
+        elif path == "/api/pullback_ma":
+            self._serve(PULLBACK_MA_CACHE, date)
+        elif path == "/api/pullback_ma_refresh":
+            self._serve(PULLBACK_MA_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:
