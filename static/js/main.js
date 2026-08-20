@@ -161,3 +161,17 @@ $("autoBtn").addEventListener("click", () => {
 
 startAuto();
 refreshNow(true);
+
+// ---- 响应式：自动把表格包进可横向滚动容器（幂等） ----
+function wrapTables() {
+  document.querySelectorAll("table").forEach((t) => {
+    const p = t.parentElement;
+    if (p && p.classList.contains("table-scroll")) return; // 已包裹
+    const wrap = document.createElement("div");
+    wrap.className = "table-scroll";
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  });
+}
+wrapTables();
+new MutationObserver(wrapTables).observe(document.body, { childList: true, subtree: true });
