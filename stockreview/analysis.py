@@ -393,6 +393,78 @@ def classify_state(hist):
 STATE_LABELS = {"uptrend": "上升趋势", "sideways": "横盘震荡", "downtrend": "下降趋势"}
 
 
+# ---------- 支撑位有效性（回测验证规则） ----------
+# 回测结论：仅"回踩+收盘站稳"胜率≈50%不可行；叠加"缩量回踩 + 次日放量阳线
+# 确认"后 3 日胜率 78%/5 日 72%（样本 423，scripts/backtest_support.py 可复现）。
+
+SUPPORT_WINDOW = 60     # 支撑位：近 60 日最低点（箱体下沿/前低）
+SUPPORT_TOUCH = 0.02    # 回踩触及容忍：low <= S * 1.02
+SUPPORT_FLOOR = 0.98    # 收盘站稳：close >= S * 0.98
+SUPPORT_SHRINK = 0.9    # 缩量：vol <= 前5日均量 * 0.9
+CONFIRM_VOL = 1.0       # 确认日放量：vol >= 前5日均量
+
+
+def support_level(hist, window=SUPPORT_WINDOW, exclude=1):
+    """支撑位：最近 window 日最低价（不含最近 exclude 日）。"""
+    if len(hist) < window + exclude:
+        return None
+    lows = [h["low"] for h in hist[-(window + exclude):-exclude] if h["low"] > 0]
+    return min(lows) if lows else None
+
+
+def is_pullback_signal(hist, i, window=SUPPORT_WINDOW, touch=SUPPORT_TOUCH,
+                       floor=SUPPORT_FLOOR, shrink=SUPPORT_SHRINK):
+    """t=i 日是否为"缩量回踩支撑"信号日：触及支撑 + 收盘站稳 + 缩量。"""
+    if i < window or i >= len(hist):
+        return False, None, None
+    S = support_level(hist[:i + 1], window=window, exclude=1)
+    if not S:
+        return False, None, None
+    t = hist[i]
+    if not (t["low"] <= S * (1 + touch) and t["close"] >= S * floor):
+        return False, None, None
+    prev5 = hist[max(0, i - 5):i]
+    prev5_avg = sum(h["volume"] for h in prev5) / len(prev5) if prev5 else 0
+    if prev5_avg <= 0:
+        return False, None, None
+    ratio = t["volume"] / prev5_avg
+    if ratio > shrink:
+        return False, None, None
+    return True, S, ratio
+
+
+def is_confirm_day(hist, i, vol_ratio=CONFIRM_VOL):
+    """t=i 日是否为确认日：放量阳线（收盘>开盘 且 量 ≥ 前5日均量）。"""
+    if i <= 0 or i >= len(hist):
+        return False, None
+    t = hist[i]
+    prev5 = hist[max(0, i - 5):i]
+    prev5_avg = sum(h["volume"] for h in prev5) / len(prev5) if prev5 else 0
+    if prev5_avg <= 0:
+        return False, None
+    ratio = t["volume"] / prev5_avg
+    return (t["close"] > t["open"] and ratio >= vol_ratio), ratio
+
+
+def support_confirmed_recent(hist, max_lag=3):
+    """最近 max_lag 个交易日内是否完成"缩量回踩支撑 + 次日放量阳线确认"。
+
+    返回 (信号日索引, 确认日索引, 支撑位, 信号缩量比, 确认量比) 或 None。
+    """
+    for lag in range(1, max_lag + 1):
+        sig = len(hist) - 1 - lag
+        cfm = sig + 1
+        if sig < 1 or cfm >= len(hist):
+            continue
+        ok_s, S, shrink_r = is_pullback_signal(hist, sig)
+        if not ok_s:
+            continue
+        ok_c, cfm_r = is_confirm_day(hist, cfm)
+        if ok_c:
+            return sig, cfm, S, shrink_r, cfm_r
+    return None
+
+
 # ---------- 突破新高判定 ----------
 
 def ma_of(hist, n):

@@ -36,6 +36,7 @@
     <button class="tab" data-tab="heatmap" type="button">市场情绪</button>
     <button class="tab" data-tab="speedrank" type="button">涨速榜</button>
     <button class="tab" data-tab="pullback_ma" type="button">回踩支撑</button>
+    <button class="tab" data-tab="support_valid" type="button">有效支撑</button>
   </nav>
 
   <main>
@@ -325,6 +326,18 @@
       <section class="panel">
         <h2>上升趋势 · 缩量回踩10日均线 <span class="sub">盘中最低触及MA10附近 + 收盘未明显跌破 + 今日缩量(≤前5日均量90%)</span></h2>
         <div id="pma10"></div>
+      </section>
+    </section>
+
+    <section id="page-support_valid" class="page hidden">
+      <section class="panel">
+        <h2>市场环境 <span id="svState" class="rt-state">加载中...</span></h2>
+        <div id="svMarket"></div>
+        <div id="svSummary"></div>
+      </section>
+      <section class="panel">
+        <h2>支撑位有效个股 <span class="sub">近60日低点支撑 + 缩量回踩 + 次日放量阳线确认（回测3日胜率78%）</span></h2>
+        <div id="svList"></div>
       </section>
     </section>
 

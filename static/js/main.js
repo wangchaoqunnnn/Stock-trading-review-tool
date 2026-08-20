@@ -16,6 +16,7 @@ import { loadLeaders } from "./leaders.js";
 import { loadHeatmap } from "./heatmap.js";
 import { loadSpeedRank } from "./speedrank.js";
 import { loadPullbackMa } from "./pullback_ma.js";
+import { loadSupportValid } from "./support_valid.js";
 
 // Tab -> 页面元素 id / 数据加载函数
 const PAGES = {
@@ -33,6 +34,7 @@ const PAGES = {
   heatmap: "page-heatmap",
   speedrank: "page-speedrank",
   pullback_ma: "page-pullback_ma",
+  support_valid: "page-support_valid",
 };
 const LOADERS = {
   daily: load,
@@ -49,6 +51,7 @@ const LOADERS = {
   heatmap: loadHeatmap,
   speedrank: loadSpeedRank,
   pullback_ma: loadPullbackMa,
+  support_valid: loadSupportValid,
 };
 
 const REFRESH_INTERVAL = 30; // 自动刷新周期（秒）

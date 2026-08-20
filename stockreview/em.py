@@ -501,7 +501,9 @@ def fetch_long_kline(code, limit=250, end_date=None):
     except Exception:
         pass
     try:
-        url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": 45})
+        # 新浪长历史：datalen 随 limit（上限 1000，约 4 年）
+        datalen = min(max(limit * 2, 100), 1000)
+        url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": datalen})
         text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"}, tries=2)
         m = re.search(r"\[(.*)\]", text, re.S)
         if m:

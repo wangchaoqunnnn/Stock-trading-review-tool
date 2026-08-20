@@ -601,11 +601,57 @@ def main():
     prev3 = snap_mod._prev_amount_at("2026-08-18 09:00")
     check(prev3 is None, "开盘前返回 None")
 
+    print("== support_valid 离线扫描 ==")
+    from stockreview.analysis import is_pullback_signal, is_confirm_day, support_confirmed_recent, support_level
+
+    def build_sv_hist(signal_low, confirm_vol, signal_close=9.4):
+        """近60日低点支撑：窗口内最低 9.0（d20），信号日触及，确认日放量阳线。"""
+        rows = []
+        for i in range(70):
+            if i < 69:
+                low = 9.0 if i == 20 else 9.3
+                rows.append({"date": f"d{i}", "open": 9.5, "close": 9.6, "high": 9.7, "low": low, "volume": 1.0e6})
+            else:
+                rows.append({"date": "d69", "open": 9.6, "close": signal_close, "high": 9.7, "low": signal_low, "volume": 0.6e6})
+        rows.append({"date": "d70", "open": 9.4, "close": 9.8, "high": 9.9, "low": 9.3, "volume": confirm_vol})
+        return rows
+
+    sv_ok = build_sv_hist(signal_low=9.1, confirm_vol=1.6e6)   # 缩量回踩+放量阳确认
+    check(support_level(sv_ok[:70], window=60, exclude=1) == 9.0, "支撑位=近60日最低9.0")
+    ok_s, S, shrink_r = is_pullback_signal(sv_ok, 69)
+    check(ok_s is True and S == 9.0 and shrink_r < 0.9, "信号日：缩量回踩支撑（缩量比<0.9）")
+    ok_c, cr = is_confirm_day(sv_ok, 70)
+    check(ok_c is True and cr >= 1.0, "确认日：放量阳线（量比≥1）")
+    hit = support_confirmed_recent(sv_ok)
+    check(hit is not None and hit[0] == 69 and hit[1] == 70, "最近1日完成信号+确认")
+
+    sv_bad = build_sv_hist(signal_low=9.1, confirm_vol=0.6e6)  # 确认日缩量阴线
+    check(support_confirmed_recent(sv_bad) is None, "确认日不放量阳线 → 不命中")
+    sv_low = build_sv_hist(signal_low=8.5, confirm_vol=1.6e6, signal_close=8.7)  # 收盘失守支撑
+    ok_s2, _, _ = is_pullback_signal(sv_low, 69)
+    check(ok_s2 is False, "收盘跌破支撑 → 信号日不成立")
+
+    SV_KLINE_MAP = {"600001": sv_ok, "600002": sv_bad, "600003": sv_low}
+    em.fetch_long_kline = lambda code, limit=250, end_date=None: [dict(x) for x in SV_KLINE_MAP.get(str(code), [])]
+    net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: [
+        stock_row("600001", "甲科技", 2.0, 5.0e8, 1.2, 1.0e8),
+        stock_row("600002", "乙软件", 1.0, 5.0e8, 1.0, 1.0e8),
+        stock_row("600003", "丙数据", 0.5, 5.0e8, 1.0, 1.0e8),
+    ]
+    import stockreview.support_valid as sv_mod
+    sv_mod.datetime = FakeDT
+    sv = sv_mod.fetch_support_valid_scan()
+    sv_map = {x["name"]: x for x in sv["stocks"]}
+    check("甲科技" in sv_map and "乙软件" not in sv_map and "丙数据" not in sv_map,
+          "仅甲科技支撑位有效（缩量回踩+放量阳确认）")
+    check(sv_map["甲科技"]["support"] == 9.0 and sv_map["甲科技"]["shrink_ratio"] < 0.9,
+          "支撑位/缩量比字段")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

@@ -29,6 +29,7 @@ from stockreview.pullback_ma import fetch_pullback_ma_scan
 from stockreview.realtime import fetch_realtime
 from stockreview.snapshot import fetch_snapshot
 from stockreview.speedrank import fetch_speedrank_scan
+from stockreview.support_valid import fetch_support_valid_scan
 from stockreview.trend3 import fetch_trend3_scan
 from stockreview.volprice import fetch_volume_price_scan
 from stockreview.ztpool import fetch_ztpool_detail
@@ -59,6 +60,8 @@ EMOTION_HISTORY_CACHE = SnapshotCache(ttl=600, fetcher=fetch_emotion_history)
 SPEEDRANK_CACHE = SnapshotCache(ttl=30, fetcher=fetch_speedrank_scan)
 # 回踩支撑：K线核对较慢，10 分钟缓存
 PULLBACK_MA_CACHE = SnapshotCache(ttl=600, fetcher=fetch_pullback_ma_scan)
+# 支撑位有效：K线核对较慢，10 分钟缓存
+SUPPORT_VALID_CACHE = SnapshotCache(ttl=600, fetcher=fetch_support_valid_scan)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -202,6 +205,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(PULLBACK_MA_CACHE, date)
         elif path == "/api/pullback_ma_refresh":
             self._serve(PULLBACK_MA_CACHE, date, force=True)
+        elif path == "/api/support_valid":
+            self._serve(SUPPORT_VALID_CACHE, date)
+        elif path == "/api/support_valid_refresh":
+            self._serve(SUPPORT_VALID_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:
