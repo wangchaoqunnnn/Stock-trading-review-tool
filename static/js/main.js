@@ -3,6 +3,7 @@
 import { $ } from "./utils.js";
 import { auto, toggleAuto, selectedDate, setSelectedDate } from "./state.js";
 import { load } from "./daily.js";
+import { loadPreopen } from "./preopen.js";
 import { loadRealtime } from "./realtime.js";
 import { loadVolPrice } from "./volprice.js";
 import { loadPullback } from "./pullback.js";
@@ -22,6 +23,7 @@ import { loadReview } from "./review.js";
 // Tab -> 页面元素 id / 数据加载函数
 const PAGES = {
   daily: "page-daily",
+  preopen: "page-preopen",
   realtime: "page-realtime",
   volprice: "page-volprice",
   pullback: "page-pullback",
@@ -40,6 +42,7 @@ const PAGES = {
 };
 const LOADERS = {
   daily: load,
+  preopen: loadPreopen,
   realtime: loadRealtime,
   volprice: loadVolPrice,
   pullback: loadPullback,

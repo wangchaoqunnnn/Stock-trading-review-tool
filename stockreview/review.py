@@ -422,8 +422,14 @@ def _stage_block(indices_pick, kline, amount, amount_prev, emotion_metrics, eh_r
     tech_parts = []
     above = [n for n, m in (("MA5", ma5), ("MA10", ma10), ("MA20", ma20)) if m is not None and close >= m]
     below = [n for n, m in (("MA5", ma5), ("MA10", ma10), ("MA20", ma20)) if m is not None and close < m]
-    tech_parts.append(f"上证指数收于 {'、'.join(above) if above else '主要均线下方'}"
-                      f"{'，下方仍有' + '、'.join(below) if below else ''}")
+    if above and below:
+        tech_parts.append(f"上证指数收于{'、'.join(above)}上方，上方受{'、'.join(below)}压制")
+    elif above:
+        tech_parts.append(f"上证指数收于{'、'.join(above)}上方")
+    elif below:
+        tech_parts.append(f"上证指数收于主要均线下方，上方受{'、'.join(below)}压制")
+    else:
+        tech_parts.append("上证指数均线关系数据不足")
     tech_parts.append(f"MA20 {'向上' if ma20_up else '走平/向下'}（{'多头发散' if above and ma20_up else '趋势未修复' if not ma20_up else '中性'}）")
     if ma60 is not None:
         tech_parts.append(f"MA60 位于 {ma60:.0f} 点构成{'中期支撑' if close >= ma60 else '中期压力'}")

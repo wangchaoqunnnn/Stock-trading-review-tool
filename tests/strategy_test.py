@@ -769,11 +769,123 @@ def main():
     check(rv_h["indices"][0]["current"] == rv_kline[13]["close"], "历史指数收盘口径（08-14）")
     check(rv_h["rhythm"] != "" and "收盘口径" in rv_h["rhythm"], "历史节奏由K线重构")
 
+    print("== preopen 离线扫描 ==")
+    import stockreview.preopen as po_mod
+
+    def fake_quotes(codes):
+        data = {
+            "usDJI": ("道琼斯", 53100.0, 53463.0, 53381.0, 98000000, 0, -363.0, -0.68, 53381.0, 52995.0),
+            "usIXIC": ("纳斯达克", 26160.0, 26331.0, 26211.0, 2500000000, 0, -171.0, -0.65, 26263.0, 26107.0),
+            "usINX": ("标普500", 7685.0, 7708.0, 7690.0, 520000000, 0, -23.0, -0.30, 7697.0, 7672.0),
+            "usNDX": ("纳斯达克100", 29290.0, 29426.0, 29295.0, 280000000, 0, -136.0, -0.46, 29379.0, 29223.0),
+            "usIWM": ("罗素2000ETF-iShares", 298.5, 301.7, 299.3, 6400000, 1933970757, -3.2, -1.06, 300.0, 297.9),
+            "usTLT": ("20年期以上美国国债ETF-iShares", 82.4, 83.0, 82.4, 7400000, 616774487, -0.6, -0.72, 82.5, 82.2),
+            "usBABA": ("阿里巴巴", 126.4, 128.9, 127.0, 0, 0, -2.5, -1.94, 128.0, 125.9),
+            "usPDD": ("拼多多", 88.1, 90.2, 89.0, 0, 0, -2.1, -2.33, 89.5, 87.5),
+            "usJD": ("京东", 29.1, 29.35, 29.2, 0, 0, -0.25, -0.85, 29.4, 28.9),
+            "usLI": ("理想汽车", 12.7, 12.71, 12.8, 0, 0, -0.01, -0.08, 12.9, 12.6),
+            "usNTES": ("网易", 121.0, 127.25, 125.0, 0, 0, -6.25, -4.91, 126.0, 120.4),
+            "usKWEB": ("中概互联网ETF-KraneShares", 26.5, 27.2, 26.9, 0, 0, -0.7, -2.57, 27.0, 26.4),
+            "usFXI": ("中国大盘股ETF-iShares", 35.5, 35.68, 35.6, 0, 0, -0.18, -0.5, 35.7, 35.4),
+            "usYINN": ("3倍做多富时中国ETF-Direxion", 29.6, 30.0, 29.8, 0, 0, -0.4, -1.33, 30.0, 29.5),
+        }
+        q = {}
+        for c in codes:
+            if c in data:
+                n, price, pre, op, vol, amt, chg, pct, hi, lo = data[c]
+                q[c] = {"name": n, "price": price, "pre_close": pre, "open": op, "vol": vol,
+                        "amount": amt, "change": chg, "pct": pct, "high": hi, "low": lo}
+        return q
+
+    po_mod._tencent_quotes = fake_quotes
+
+    def fake_universe():
+        rows = []
+
+        def mk(code, name, pct, ind, amt=1.0e8):
+            rows.append({"f2": 100.0, "f3": pct, "f6": amt, "f12": code, "f14": name, "f100": ind})
+
+        # 信息技术 8 只（含 +90% 妖股与下跌股 → 验证中位数稳健性）
+        mk("S1", "甲芯", 1.5, "信息技术"); mk("S2", "乙软", 0.8, "信息技术"); mk("S3", "丙数", 0.3, "信息技术")
+        mk("S4", "丁端", -0.2, "信息技术"); mk("S5", "戊云", 0.0, "信息技术"); mk("S6", "妖股", 90.0, "信息技术")
+        mk("S7", "庚芯", -1.0, "信息技术"); mk("S8", "辛软", 6.0, "信息技术")
+        # 能源 6 只
+        mk("E1", "油甲", 2.0, "能源"); mk("E2", "油乙", 1.5, "能源"); mk("E3", "气丙", 0.5, "能源")
+        mk("E4", "煤丁", -0.5, "能源"); mk("E5", "油戊", 3.0, "能源"); mk("E6", "油己", 0.2, "能源")
+        # 无行业 / 无涨跌幅（应被跳过）
+        mk("X1", "无名1", 5.0, "-"); mk("X2", "无名2", 5.0, None)
+        rows.append({"f2": 100.0, "f3": None, "f6": 2.0e8, "f12": "X3", "f14": "停牌", "f100": "信息技术"})
+        return rows
+
+    po_mod._us_universe = fake_universe
+
+    def fake_ulist(secids):
+        m = {
+            "100.UDI": ("美元指数", 98.8, 0.03, 98.79),
+            "101.GC00Y": ("COMEX黄金", 4545.0, -0.11, 4550.0),
+            "133.USDCNH": ("离岸人民币(USDCNH)", 6.725, -0.09, 6.731),
+        }
+        out = []
+        for s in secids:
+            if s in m:
+                n, price, pct, pre = m[s]
+                out.append({"f2": price, "f3": pct, "f12": s, "f14": n, "f17": price, "f18": pre})
+        return out
+
+    po_mod._em_ulist = fake_ulist
+    po_mod._sina_oil = lambda: {"name": "纽约原油", "price": 85.6, "pre_close": 85.8, "high": 87.7, "low": 84.2, "pct": -0.23}
+
+    def fake_kline():
+        rows = []
+        close = 50000.0
+        for i in range(70):
+            c = close * 1.002
+            rows.append([f"2026-08-{i + 1:02d}", round(close * 0.998, 2), round(c, 2),
+                         round(c * 1.005, 2), round(close * 0.995, 2), 100000000 + i])
+            close = c
+        return rows
+
+    po_mod._dow_kline = fake_kline
+    po_mod.datetime = FakeDT
+    po = po_mod.fetch_preopen()
+    names = [i["name"] for i in po["indices"]]
+    check(len(po["indices"]) == 5 and "道琼斯工业" in names and "罗素2000" in names, "五大美股指数齐全（罗素2000 以 IWM 代理）")
+    check(po["indices"][0]["price"] == 53100.0 and po["indices"][0]["pct"] == -0.68, "指数点位/涨跌幅")
+    check("低开" in po["rhythm"] or "高开" in po["rhythm"] or "平开" in po["rhythm"], "指数节奏描述")
+    b = po["market"]["breadth"]
+    check(b["up"] == 12 and b["down"] == 3 and b["flat"] == 1,
+          f"涨跌分布（仅NaN跳过，无行业也计入）实际 {b['up']}/{b['down']}/{b['flat']}")
+    check(b["big_up"] == 4 and b["wild"] == 1, "大涨/异动计数")
+    check(b["total_amt_yi"] == 16.0, f"个股成交合计 16 亿（NaN 不计）实际 {b['total_amt_yi']}")
+    check(po["market"]["rating"]["level"] in ("极寒", "偏冷", "温和", "火热"), "赚钱效应评级")
+    sec_top = po["sectors"]["top"]
+    check(sec_top[0]["name"] == "能源" and sec_top[0]["pct"] == 1.0, "板块涨幅取中位数（能源1.0，妖股不扭曲）")
+    info = next(s for s in sec_top if s["name"] == "信息技术")
+    check(info["pct"] == 0.55, f"信息技术中位数 0.55（均值会被妖股拉到 12.2）实际 {info['pct']}")
+    check(info["leader"] == "妖股" and info["leader_pct"] == 90.0, "板块领涨龙头=组内涨幅最大者")
+    check("能源板块领涨" in po["sectors"]["feature"], "板块特征")
+    cn_groups = {g["group"]: g["avg_pct"] for g in po["cn"]["groups"]}
+    check(abs(cn_groups["互联网"] + 2.51) < 0.01 and abs(cn_groups["新能源车"] + 0.08) < 0.01, "中概分组均值")
+    check("网易" in po["cn"]["verdict"] and "中概互联网ETF" in po["cn"]["verdict"], "中概解读")
+    fx_names = [r["name"] for r in po["fx"]["rows"]]
+    check("美元指数" in fx_names and "COMEX黄金" in fx_names and "离岸人民币(USDCNH)" in fx_names
+          and "纽约原油" in fx_names and "美债20年+(TLT)" in fx_names, "外围资产五大品种齐全")
+    check("收益率下行" in po["fx"]["verdict"], "外围传导解读（美债回落→成长估值支撑）")
+    check(po["mainline"]["main"] == "能源" and "油气/煤炭" in po["mainline"]["impact_a"], "主线与A股传导")
+    check(po["mainline"]["style"] != "", "风格判断")
+    check(po["stage"]["phase"] == "多头趋势延续" and "MA60" in po["stage"]["tech"], "阶段判定（强多头）")
+    check("开盘重点观察" in po["stage"]["focus"], "开盘观察方向")
+    check(po["summary"].startswith("隔夜美股") and "不构成任何投资建议" in po["risk"], "总结与风险提示")
+
+    po_h = po_mod.fetch_preopen(date="2026-08-14")
+    check(any("不支持历史回放" in e for e in po_h["errors"]), "历史模式标注（美股为隔夜口径）")
+    check(len(po_h["indices"]) == 5, "历史参数不影响数据抓取")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

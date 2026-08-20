@@ -482,9 +482,9 @@ th.sortable.active {
 .mob-more-arrow { margin-left: 4px; font-size: 10px; }
 
 /* ---------- 复盘总结页 ---------- */
-#page-review { --rv-top: calc(var(--topbar-h, 50px) + var(--tabbar-h, 47px)); }
-section[id^="rv-sec-"] { scroll-margin-top: calc(var(--rv-top, 52px) + 14px); }
-#page-review.brief .rv-extra { display: none; }
+#page-review, #page-preopen { --rv-top: calc(var(--topbar-h, 50px) + var(--tabbar-h, 47px)); }
+section[id^="rv-sec-"], section[id^="po-sec-"] { scroll-margin-top: calc(var(--rv-top, 52px) + 14px); }
+#page-review.brief .rv-extra, #page-preopen.brief .rv-extra { display: none; }
 
 .rv-nav {
   position: sticky;
@@ -620,6 +620,8 @@ section[id^="rv-sec-"] { scroll-margin-top: calc(var(--rv-top, 52px) + 14px); }
 
 .rv-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .rv-list { list-style: none; padding: 0; margin: 0; font-size: 12.5px; line-height: 1.9; }
+.rv-cn-group { margin-bottom: 4px; }
+.rv-cn-group .rv-sub { display: flex; justify-content: space-between; align-items: baseline; }
 
 .rv-phase {
   display: inline-block;

@@ -26,6 +26,7 @@ from stockreview.leaders import fetch_leaders_scan
 from stockreview.limit20 import fetch_limit20_scan
 from stockreview.pullback import fetch_pullback_scan
 from stockreview.pullback_ma import fetch_pullback_ma_scan
+from stockreview.preopen import fetch_preopen
 from stockreview.realtime import fetch_realtime
 from stockreview.review import fetch_review
 from stockreview.snapshot import fetch_snapshot
@@ -65,6 +66,8 @@ PULLBACK_MA_CACHE = SnapshotCache(ttl=600, fetcher=fetch_pullback_ma_scan)
 SUPPORT_VALID_CACHE = SnapshotCache(ttl=600, fetcher=fetch_support_valid_scan)
 # 复盘总结：聚合多数据源，10 分钟缓存
 REVIEW_CACHE = SnapshotCache(ttl=600, fetcher=fetch_review)
+# 开盘前瞻：隔夜美股+外围，10 分钟缓存
+PREOPEN_CACHE = SnapshotCache(ttl=600, fetcher=fetch_preopen)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -216,6 +219,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(REVIEW_CACHE, date)
         elif path == "/api/review_refresh":
             self._serve(REVIEW_CACHE, date, force=True)
+        elif path == "/api/preopen":
+            self._serve(PREOPEN_CACHE, date)
+        elif path == "/api/preopen_refresh":
+            self._serve(PREOPEN_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

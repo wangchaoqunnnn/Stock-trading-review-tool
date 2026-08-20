@@ -23,6 +23,7 @@
 
   <nav class="tabbar">
     <button class="tab active" data-tab="daily" type="button">每日复盘</button>
+    <button class="tab" data-tab="preopen" type="button">开盘前瞻</button>
     <button class="tab" data-tab="realtime" type="button">实时盘口</button>
     <button class="tab" data-tab="volprice" type="button">量价异动</button>
     <button class="tab" data-tab="pullback" type="button">涨停回踩</button>
@@ -79,6 +80,68 @@
             <div id="news"></div>
           </section>
         </div>
+      </section>
+    </section>
+
+    <section id="page-preopen" class="page hidden">
+      <nav class="rv-nav" aria-label="开盘前瞻模块导航">
+        <a href="#po-sec-indices">① 美股指数</a>
+        <a href="#po-sec-emotion">② 情绪</a>
+        <a href="#po-sec-sectors">③ 板块</a>
+        <a href="#po-sec-cn">④ 中概</a>
+        <a href="#po-sec-fx">⑤ 外围</a>
+        <a href="#po-sec-mainline">⑥ 主线</a>
+        <a href="#po-sec-stage">⑦ 阶段</a>
+        <a href="#po-sec-summary">⑧ 总结</a>
+      </nav>
+      <div class="rv-actions">
+        <span id="poState" class="rv-state-text">加载中...</span>
+        <span class="rv-spacer"></span>
+        <button id="poMode" type="button">精简模式</button>
+      </div>
+
+      <section class="panel" id="po-sec-indices">
+        <h2>一、美股核心指数概览</h2>
+        <div id="poIndices"></div>
+        <p id="poTotal" class="rv-text"></p>
+        <p id="poRhythm" class="rv-text"></p>
+      </section>
+
+      <section class="panel" id="po-sec-emotion">
+        <h2>二、美股市场情绪温度计</h2>
+        <div id="poBreadth"></div>
+        <div id="poRating"></div>
+      </section>
+
+      <section class="panel rv-extra" id="po-sec-sectors">
+        <h2>三、美股板块轮动图谱</h2>
+        <div id="poSectors"></div>
+        <p id="poFeature" class="rv-text"></p>
+      </section>
+
+      <section class="panel rv-extra" id="po-sec-cn">
+        <h2>四、中概股 &amp; 港股 ADR 动向</h2>
+        <div id="poCn"></div>
+      </section>
+
+      <section class="panel" id="po-sec-fx">
+        <h2>五、外围关键资产联动</h2>
+        <div id="poFx"></div>
+      </section>
+
+      <section class="panel" id="po-sec-mainline">
+        <h2>六、主线与强弱研判（美股 + 传导 A 股）</h2>
+        <div id="poMainline"></div>
+      </section>
+
+      <section class="panel" id="po-sec-stage">
+        <h2>七、行情阶段客观解读</h2>
+        <div id="poStage"></div>
+      </section>
+
+      <section class="panel" id="po-sec-summary">
+        <h2>前瞻总结</h2>
+        <div id="poSummary"></div>
       </section>
     </section>
 
