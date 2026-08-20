@@ -64,14 +64,65 @@ let refreshing = false;
 function switchTab(name) {
   activeTab = name;
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".sheet-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   for (const [tab, pageId] of Object.entries(PAGES)) {
     $(pageId).classList.toggle("hidden", tab !== name);
   }
+  updateMobCurrent();
   // 切到非每日复盘页时立即强制刷新（保持历史行为）
   if (name !== "daily") LOADERS[name](true);
 }
 
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+// ---- 移动端：当前页 + "全部页面"底部弹层切换 ----
+const TAB_LABELS = {};
+document.querySelectorAll(".tab").forEach((b) => {
+  TAB_LABELS[b.dataset.tab] = b.textContent.trim();
+});
+
+function updateMobCurrent() {
+  $("mobCurrent").textContent = TAB_LABELS[activeTab] || activeTab;
+}
+
+function openTabSheet() {
+  $("tabSheetMask").hidden = false;
+  $("tabSheetGrid").querySelectorAll(".sheet-tab").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === activeTab);
+  });
+}
+
+function closeTabSheet() {
+  $("tabSheetMask").hidden = true;
+}
+
+function buildTabSheet() {
+  const grid = $("tabSheetGrid");
+  grid.innerHTML = "";
+  for (const name of Object.keys(PAGES)) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "sheet-tab";
+    b.dataset.tab = name;
+    b.textContent = TAB_LABELS[name] || name;
+    b.addEventListener("click", () => {
+      switchTab(name);
+      closeTabSheet();
+    });
+    grid.appendChild(b);
+  }
+}
+
+buildTabSheet();
+$("mobMoreBtn").addEventListener("click", openTabSheet);
+$("tabSheetClose").addEventListener("click", closeTabSheet);
+$("tabSheetMask").addEventListener("click", (e) => {
+  if (e.target === $("tabSheetMask")) closeTabSheet();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeTabSheet();
+});
+updateMobCurrent();
 
 // 顶部刷新状态：倒计时显示（由本模块统一管理）
 function updateCountdown() {

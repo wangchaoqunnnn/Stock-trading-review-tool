@@ -413,6 +413,69 @@ th.sortable.active {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ---------- 移动端页面切换：底部弹层 ---------- */
+.mob-nav { display: none; }
+
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.sheet-mask[hidden] { display: none; }
+
+.tab-sheet {
+  width: 100%;
+  max-width: 640px;
+  max-height: 78vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px 14px 0 0;
+  padding: 12px 14px calc(16px + env(safe-area-inset-bottom));
+  animation: sheetUp 0.18s ease-out;
+}
+@keyframes sheetUp {
+  from { transform: translateY(30px); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+
+.tab-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.tab-sheet-close { padding: 4px 10px; font-size: 13px; line-height: 1; }
+
+.tab-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.sheet-tab {
+  padding: 11px 6px;
+  font-size: 13px;
+  border-radius: 8px;
+  text-align: center;
+  background: #1a2130;
+  color: var(--muted);
+}
+.sheet-tab.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(76, 141, 255, 0.08);
+}
+
+.mob-current { font-size: 14px; font-weight: 700; color: var(--text); }
+.mob-more { padding: 6px 12px; font-size: 12px; }
+.mob-more-arrow { margin-left: 4px; font-size: 10px; }
+
 /* ---------- 响应式：手机 / 平板 ---------- */
 @media (max-width: 768px) {
   body { font-size: 13px; }
@@ -432,13 +495,16 @@ th.sortable.active {
   .actions { gap: 6px; }
   .actions button { padding: 6px 10px; font-size: 12px; }
 
-  .tabbar {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    white-space: nowrap;
-    padding: 8px 12px 0;
+  .tabbar { display: none; }
+  .mob-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(11, 14, 20, 0.9);
+    border-bottom: 1px solid var(--border);
   }
-  .tab { display: inline-block; padding: 8px 12px; flex: 0 0 auto; }
 
   main { padding: 10px 10px 26px; }
   .panel { padding: 10px; margin-bottom: 10px; }

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>A股每日复盘</title>
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -37,6 +37,11 @@
     <button class="tab" data-tab="speedrank" type="button">涨速榜</button>
     <button class="tab" data-tab="pullback_ma" type="button">回踩支撑</button>
     <button class="tab" data-tab="support_valid" type="button">有效支撑</button>
+  </nav>
+
+  <nav class="mob-nav" aria-label="页面切换">
+    <span class="mob-current" id="mobCurrent">每日复盘</span>
+    <button type="button" class="mob-more" id="mobMoreBtn">全部页面 <span class="mob-more-arrow">▾</span></button>
   </nav>
 
   <main>
@@ -343,6 +348,16 @@
 
     <section id="errors" class="errors"></section>
   </main>
+
+  <div class="sheet-mask" id="tabSheetMask" hidden>
+    <div class="tab-sheet" role="dialog" aria-modal="true" aria-label="切换页面">
+      <div class="tab-sheet-head">
+        <span>切换页面</span>
+        <button type="button" class="tab-sheet-close" id="tabSheetClose">✕</button>
+      </div>
+      <div class="tab-sheet-grid" id="tabSheetGrid"></div>
+    </div>
+  </div>
 
   <script type="module" src="/js/main.js"></script>
 </body>
