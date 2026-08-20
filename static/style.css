@@ -438,7 +438,7 @@ th.sortable.active {
     white-space: nowrap;
     padding: 8px 12px 0;
   }
-  .tab { display: inline-block; padding: 8px 12px; }
+  .tab { display: inline-block; padding: 8px 12px; flex: 0 0 auto; }
 
   main { padding: 10px 10px 26px; }
   .panel { padding: 10px; margin-bottom: 10px; }
