@@ -27,6 +27,7 @@ from stockreview.limit20 import fetch_limit20_scan
 from stockreview.pullback import fetch_pullback_scan
 from stockreview.pullback_ma import fetch_pullback_ma_scan
 from stockreview.realtime import fetch_realtime
+from stockreview.review import fetch_review
 from stockreview.snapshot import fetch_snapshot
 from stockreview.speedrank import fetch_speedrank_scan
 from stockreview.support_valid import fetch_support_valid_scan
@@ -62,6 +63,8 @@ SPEEDRANK_CACHE = SnapshotCache(ttl=30, fetcher=fetch_speedrank_scan)
 PULLBACK_MA_CACHE = SnapshotCache(ttl=600, fetcher=fetch_pullback_ma_scan)
 # 支撑位有效：K线核对较慢，10 分钟缓存
 SUPPORT_VALID_CACHE = SnapshotCache(ttl=600, fetcher=fetch_support_valid_scan)
+# 复盘总结：聚合多数据源，10 分钟缓存
+REVIEW_CACHE = SnapshotCache(ttl=600, fetcher=fetch_review)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -209,6 +212,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(SUPPORT_VALID_CACHE, date)
         elif path == "/api/support_valid_refresh":
             self._serve(SUPPORT_VALID_CACHE, date, force=True)
+        elif path == "/api/review":
+            self._serve(REVIEW_CACHE, date)
+        elif path == "/api/review_refresh":
+            self._serve(REVIEW_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

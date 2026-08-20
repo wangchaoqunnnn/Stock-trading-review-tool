@@ -647,11 +647,133 @@ def main():
     check(sv_map["甲科技"]["support"] == 9.0 and sv_map["甲科技"]["shrink_ratio"] < 0.9,
           "支撑位/缩量比字段")
 
+    print("== review 离线扫描 ==")
+    import stockreview.review as review_mod
+
+    def fake_indices():
+        return [
+            {"name": "上证指数", "pre_close": 3000.0, "current": 3050.0, "pct": 1.67, "avg_price": None, "above_avg": None, "vs_avg_pct": None},
+            {"name": "深证成指", "pre_close": 10000.0, "current": 10150.0, "pct": 1.5, "avg_price": None, "above_avg": None, "vs_avg_pct": None},
+            {"name": "创业板指", "pre_close": 2000.0, "current": 2040.0, "pct": 2.0, "avg_price": None, "above_avg": None, "vs_avg_pct": None},
+            {"name": "科创50", "pre_close": 1000.0, "current": 1016.0, "pct": 1.6, "avg_price": None, "above_avg": None, "vs_avg_pct": None},
+            {"name": "沪深300", "pre_close": 3500.0, "current": 3520.0, "pct": 0.57, "avg_price": None, "above_avg": None, "vs_avg_pct": None},
+        ]
+
+    def fake_ex_pool_rv(path, date=None):
+        if path == "getTopicZTPool":
+            return {"tc": 60, "pool": [
+                {"c": "600001", "n": "甲科技", "hybk": "半导体", "fbt": 93000, "lbc": 4, "zbc": 0, "fund": 3.0e8, "zdp": 10.0, "amount": 2.0e8, "hs": 10.0},
+                {"c": "600002", "n": "乙软件", "hybk": "软件", "fbt": 94000, "lbc": 2, "zbc": 0, "fund": 1.0e8, "zdp": 10.0, "amount": 1.0e8, "hs": 8.0},
+            ]}
+        if path == "getTopicZBPool":
+            return {"tc": 10, "pool": []}
+        return {"tc": 3, "pool": []}
+
+    # 70 根日K：缓涨多头（用于 MA20/MA60 技术形态与历史回放）
+    rv_kline = []
+    prev = None
+    for i in range(70):
+        d = f"2026-08-{i + 1:02d}"
+        c = round(10.0 * (1.004 ** (i + 1)), 2)
+        o = round(c * 0.998, 2)
+        rv_kline.append({
+            "date": d, "open": o, "close": c, "high": round(c * 1.01, 2),
+            "low": round(c * 0.99, 2), "volume": 1.0e6, "amount": 1.0e7,
+            "pct": round((c / prev - 1) * 100, 2) if prev else 0.0,
+        })
+        prev = c
+
+    def fake_index_kline(secid, limit=45, end_date=None):
+        rows = [dict(x) for x in rv_kline]
+        if end_date:
+            rows = [r for r in rows if r["date"] <= end_date]
+        return rows[-limit:]
+
+    em.fetch_indices = fake_indices
+    em.fetch_market_amount = lambda: 25000.0
+    em.fetch_breadth = lambda date=None: {"up": 4000, "down": 1000, "flat": 200, "distribution": [], "date": "20260814"}
+    em.fetch_ex_pool = fake_ex_pool_rv
+    em.fetch_zt_pool = lambda: fake_ex_pool_rv("getTopicZTPool")
+    em.fetch_zb_pool = lambda: fake_ex_pool_rv("getTopicZBPool")
+    em.fetch_dt_pool = lambda: fake_ex_pool_rv("getTopicDTPool")
+    em.fetch_industry_boards = lambda: [dict(x) for x in FAKE_BOARDS]
+    em.fetch_concept_boards = lambda: [dict(x) for x in FAKE_CONCEPT]
+    em.fetch_stock_flow_top = lambda po=1, pz=40: [
+        {"name": "甲科技", "pct": 5.0, "flow_yi": 8.0, "amount_yi": 10.0, "turnover": 5.0, "vol_ratio": 2.0, "ratio": 0.5},
+        {"name": "乙软件", "pct": 2.0, "flow_yi": 3.0, "amount_yi": 5.0, "turnover": 4.0, "vol_ratio": 1.5, "ratio": 0.4},
+        {"name": "丙数据", "pct": 1.0, "flow_yi": 1.0, "amount_yi": 3.0, "turnover": 3.0, "vol_ratio": 1.2, "ratio": 0.3},
+    ] if po == 1 else [
+        {"name": "丁材料", "pct": -3.0, "flow_yi": -2.0, "amount_yi": 4.0, "turnover": 3.0, "vol_ratio": 1.0, "ratio": 0.2},
+        {"name": "戊金融", "pct": -1.0, "flow_yi": -1.0, "amount_yi": 2.0, "turnover": 2.0, "vol_ratio": 0.8, "ratio": 0.1},
+    ]
+    em.fetch_index_kline = fake_index_kline
+    em.fetch_board_kline = lambda code, limit=45, end_date=None: [
+        {"date": f"2026-08-{10 + i:02d}", "open": 10.0 + i * 0.1, "close": 10.0 + (i + 1) * 0.1,
+         "high": 10.0 + (i + 2) * 0.1, "low": 10.0 + i * 0.05, "volume": 1.0e6, "amount": 1.0e7, "pct": 1.0}
+        for i in range(8)
+    ]
+    em.fetch_amount_minutes = lambda secid, ndays=2: {
+        "2026-08-14": [(f"{h}:{m:02d}", 1.0e9) for h in (9, 10) for m in (0, 15, 30, 45)],
+        "2026-08-15": [(f"{h}:{m:02d}", 1.0e9) for h in (9, 10) for m in (0, 15, 30, 45)],
+    }
+
+    def fake_http_get_json(url, headers=None, tries=3):
+        if "trends2" in url:
+            pts = ["09:30,100.0,100.0,100.2,99.8,1,1,100.0"] * 20
+            pts.append("15:00,100.0,101.0,101.0,100.0,1,1,100.2")
+            return {"data": {"preClose": 100.0, "trends": pts}}
+        if "ulist" in url:
+            return {"data": {"diff": [
+                {"f6": 1.0e11, "f12": "1.000001", "f14": "上证指数"},
+                {"f6": 1.2e11, "f12": "0.399001", "f14": "深证成指"},
+            ]}}
+        raise RuntimeError("unexpected url: " + url)
+
+    review_mod.http_get_json = fake_http_get_json
+    review_mod.fetch_emotion_history = lambda date=None, days=6: {
+        "rows": [
+            {"date": "2026-08-10", "score": 30.0, "level": "低迷"},
+            {"date": "2026-08-11", "score": 35.0, "level": "低迷"},
+            {"date": "2026-08-12", "score": 45.0, "level": "中性"},
+            {"date": "2026-08-13", "score": 52.0, "level": "中性"},
+            {"date": "2026-08-14", "score": 58.0, "level": "中性"},
+            {"date": "2026-08-15", "score": 62.0, "level": "活跃"},
+        ],
+        "errors": [],
+    }
+    review_mod.datetime = FakeDT
+    rv = review_mod.fetch_review()
+    check(len(rv["indices"]) == 5 and rv["indices"][0]["name"] == "上证指数", "五大指数齐全且按页面顺序")
+    check(rv["indices"][0]["amount_yi"] == 1000.0, "指数成交额字段（1e11→1000亿）")
+    check(rv["amount"]["prev_yi"] is not None and rv["amount"]["diff_pct"] is not None and "放量" in rv["amount"]["verdict"],
+          "环比成交额计算（放量）")
+    check("普涨" in rv["breadth"]["verdict"], "涨跌分布：普涨格局")
+    check(rv["limit"]["zt"] == 60 and abs(rv["limit"]["zb_rate"] - 14.3) < 0.2, "涨停/炸板率")
+    check(any(x["board"] == 4 and x["count"] == 1 for x in rv["limit"]["ladder"]) and rv["limit"]["max_lb"] == 4, "连板梯队/最高板")
+    check(rv["limit"]["rating"] in ("极寒", "偏冷", "温和", "火热"), "赚钱效应评级")
+    check(abs(rv["emotion"]["score"] - 66.6) < 0.1 and rv["emotion"]["level"] == "活跃", "情绪分/等级")
+    check(rv["cycle"]["desc"] != "" and "上行" in rv["cycle"]["desc"], "情绪周期趋势描述")
+    check(rv["boards"]["top"][0]["name"] == "半导体" and rv["boards"]["top"][0]["leader"] == "甲", "板块TOP排序+领涨龙头")
+    check(any(b["name"] == "银行" for b in rv["boards"]["bottom"]), "跌幅榜含银行")
+    check("主要方向" in rv["north"]["verdict"] and rv["north"]["stock_in"][0]["name"] == "甲科技", "资金动向替代观测")
+    check(rv["mainline"]["main"] == "半导体" and "持续走强" in rv["mainline"]["persist"], "核心主线=半导体+持续性判断")
+    check(rv["mainline"]["style"] == "成长风格占优（创业板/科创强于上证），小盘题材相对活跃。", "风格判断（成长占优）")
+    check(rv["stage"]["phase"] in ("反弹途中", "震荡修复（偏多）"), "阶段判定（强多头结构）")
+    check("MA60" in rv["stage"]["tech"] and "压力位" in rv["stage"]["tech"], "技术形态含中期均线与压力支撑")
+    check(rv["summary"].startswith("2026-08-15"), "总结含日期")
+    check("不构成任何投资建议" in rv["risk"], "风险提示")
+
+    rv_h = review_mod.fetch_review(date="2026-08-14")
+    check(rv_h["history_date"] == "2026-08-14" and any("历史回放" in e for e in rv_h["errors"]), "历史模式标注")
+    check(rv_h["breadth"]["up"] == 0 and rv_h["breadth"]["down"] == 0, "历史模式涨跌家数不可得")
+    check(rv_h["indices"][0]["current"] == rv_kline[13]["close"], "历史指数收盘口径（08-14）")
+    check(rv_h["rhythm"] != "" and "收盘口径" in rv_h["rhythm"], "历史节奏由K线重构")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)
