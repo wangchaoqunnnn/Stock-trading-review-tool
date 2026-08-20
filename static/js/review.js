@@ -246,7 +246,7 @@ async function exportHtml() {
     #page-review{display:block;margin:0 auto;max-width:1200px;padding:16px;--rv-top:0}
     #page-review .rv-nav{top:0}
     section[id^="rv-sec-"]{scroll-margin-top:16px}
-    body{background:#f4f6f9}
+    body{background:#0b0e14}
   </style>`;
   const title = `A股大盘复盘_${lastData.date_label || "当日"}`;
   const html = `<!doctype html><html lang="zh-CN"><head>
