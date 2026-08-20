@@ -247,11 +247,16 @@ tr:last-child td { border-bottom: none; }
 .hidden { display: none; }
 
 .tabbar {
+  position: sticky;
+  top: var(--topbar-h, 50px);
+  z-index: 8;
   display: flex;
   gap: 8px;
   padding: 12px 18px 0;
   max-width: 1600px;
   margin: 0 auto;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
 .tab {
@@ -477,7 +482,7 @@ th.sortable.active {
 .mob-more-arrow { margin-left: 4px; font-size: 10px; }
 
 /* ---------- 复盘总结页 ---------- */
-#page-review { --rv-top: 52px; }
+#page-review { --rv-top: calc(var(--topbar-h, 50px) + var(--tabbar-h, 47px)); }
 section[id^="rv-sec-"] { scroll-margin-top: calc(var(--rv-top, 52px) + 14px); }
 #page-review.brief .rv-extra { display: none; }
 
@@ -667,12 +672,15 @@ section[id^="rv-sec-"] { scroll-margin-top: calc(var(--rv-top, 52px) + 14px); }
 
   .tabbar { display: none; }
   .mob-nav {
+    position: sticky;
+    top: var(--topbar-h, 50px);
+    z-index: 8;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
     padding: 8px 12px;
-    background: rgba(11, 14, 20, 0.9);
+    background: rgba(11, 14, 20, 0.95);
     border-bottom: 1px solid var(--border);
   }
 
@@ -697,7 +705,6 @@ section[id^="rv-sec-"] { scroll-margin-top: calc(var(--rv-top, 52px) + 14px); }
   .errors { font-size: 11px; }
 
   /* 复盘总结页 */
-  #page-review { --rv-top: 96px; }
   .rv-nav { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .rv-nav a { flex: 0 0 auto; }
   .rv-cols { grid-template-columns: 1fr; }

@@ -217,7 +217,7 @@ async function exportHtml() {
     css = "";
   }
   const override = `<style>
-    #page-review{display:block;margin:0 auto;max-width:1200px;padding:16px}
+    #page-review{display:block;margin:0 auto;max-width:1200px;padding:16px;--rv-top:0}
     #page-review .rv-nav{top:0}
     section[id^="rv-sec-"]{scroll-margin-top:16px}
     body{background:#0b0e14}

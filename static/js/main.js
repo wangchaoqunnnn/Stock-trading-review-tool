@@ -229,3 +229,23 @@ function wrapTables() {
 }
 wrapTables();
 new MutationObserver(wrapTables).observe(document.body, { childList: true, subtree: true });
+
+// ---- 固定标签栏：实测顶栏/标签栏高度，供 sticky 偏移使用 ----
+function syncStickyOffsets() {
+  const root = document.documentElement;
+  const tb = document.querySelector(".topbar");
+  const tab = document.querySelector(".tabbar");
+  const mnav = document.querySelector(".mob-nav");
+  if (tb) root.style.setProperty("--topbar-h", tb.offsetHeight + "px");
+  // 移动端 tabbar 隐藏时用 mob-nav 高度
+  let navH = 0;
+  if (tab && getComputedStyle(tab).display !== "none") navH = tab.offsetHeight;
+  else if (mnav && getComputedStyle(mnav).display !== "none") navH = mnav.offsetHeight;
+  if (navH > 0) root.style.setProperty("--tabbar-h", navH + "px");
+}
+syncStickyOffsets();
+window.addEventListener("resize", syncStickyOffsets);
+window.addEventListener("load", syncStickyOffsets);
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(syncStickyOffsets).observe(document.body);
+}
