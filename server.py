@@ -33,6 +33,7 @@ from stockreview.review import fetch_review
 from stockreview.snapshot import fetch_snapshot
 from stockreview.speedrank import fetch_speedrank_scan
 from stockreview.support_valid import fetch_support_valid_scan
+from stockreview.trading import fetch_trading
 from stockreview.trend3 import fetch_trend3_scan
 from stockreview.volprice import fetch_volume_price_scan
 from stockreview.ztpool import fetch_ztpool_detail
@@ -71,6 +72,8 @@ REVIEW_CACHE = SnapshotCache(ttl=600, fetcher=fetch_review)
 PREOPEN_CACHE = SnapshotCache(ttl=600, fetcher=fetch_preopen)
 # 全球宏观：跨市场聚合，10 分钟缓存
 GLOBALMAC_CACHE = SnapshotCache(ttl=600, fetcher=fetch_globalmac)
+# 交易策略：扫描类聚合，10 分钟缓存
+TRADING_CACHE = SnapshotCache(ttl=600, fetcher=fetch_trading)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -230,6 +233,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(GLOBALMAC_CACHE, date)
         elif path == "/api/globalmac_refresh":
             self._serve(GLOBALMAC_CACHE, date, force=True)
+        elif path == "/api/trading":
+            self._serve(TRADING_CACHE, date)
+        elif path == "/api/trading_refresh":
+            self._serve(TRADING_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

@@ -950,11 +950,39 @@ def main():
     gm_h = gm_mod.fetch_globalmac(date="2026-08-14")
     check(any("不支持历史回放" in e for e in gm_h["errors"]), "历史参数标注")
 
+    print("== trading 离线扫描 ==")
+    import stockreview.trading as trading_mod
+
+    trading_mod.fetch_support_valid_scan = lambda date=None: {"stocks": [
+        {"code": "600001", "name": "甲科技", "industry": "半导体", "support": 9.0,
+         "signal_date": "2026-08-14", "confirm_date": "2026-08-15",
+         "shrink_ratio": 0.6, "confirm_vol": 1.5},
+    ]}
+    trading_mod.fetch_pullback_scan = lambda date=None: {"stocks": [
+        {"code": "600002", "name": "乙软件", "industry": "软件", "limit_date": "2026-08-14",
+         "limit_pct": 10.0, "ma20": 12.0, "hist_vol_ratio": 0.2, "days_since": 3, "hot": True},
+        {"code": "600001", "name": "甲科技", "industry": "半导体", "limit_date": "2026-08-16",
+         "limit_pct": 20.0, "ma20": 9.5, "hist_vol_ratio": 0.3, "days_since": 1, "hot": False},
+    ]}
+    trading_mod.datetime = FakeDT
+    td = trading_mod.fetch_trading()
+    check(len(td["systems"]) == 2 and td["systems"][0]["backtest"]["win3"] == "78.0%"
+          and td["systems"][1]["backtest"]["win5"] == "53.8%", "交易系统定义（含真实回测数据）")
+    check(len(td["unused_systems"]) == 1 and "接近随机" in td["unused_systems"][0]["reason"], "回测不达标系统说明")
+    check(td["pool_count"] == 2, "股票池（同代码去重：甲科技只保留 sys1）")
+    s1 = next(r for r in td["pool"] if r["code"] == "600001")
+    check(s1["system_id"] == "sys1" and s1["add_date"] == "2026-08-15" and "放量阳线确认" in s1["reason"],
+          "系统1信号：确认日加入+看多理由")
+    s2 = next(r for r in td["pool"] if r["code"] == "600002")
+    check(s2["system_id"] == "sys2" and s2["industry"] == "软件" and "缩量回踩" in s2["reason"],
+          "系统2信号：涨停回踩+板块")
+    check("不构成任何投资建议" in td["risk"], "风险提示")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

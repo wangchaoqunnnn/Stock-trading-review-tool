@@ -40,6 +40,7 @@
     <button class="tab" data-tab="support_valid" type="button">有效支撑</button>
     <button class="tab" data-tab="review" type="button">复盘总结</button>
     <button class="tab" data-tab="globalmac" type="button">全球宏观</button>
+    <button class="tab" data-tab="trading" type="button">交易策略</button>
   </nav>
 
   <nav class="mob-nav" aria-label="页面切换">
@@ -532,6 +533,38 @@
       <section class="panel" id="gm-sec-summary">
         <h2>总结与风险提示</h2>
         <div id="gmSummary"></div>
+      </section>
+    </section>
+
+    <section id="page-trading" class="page hidden">
+      <nav class="rv-nav" aria-label="交易策略模块导航">
+        <a href="#td-sec-systems">① 交易系统</a>
+        <a href="#td-sec-pool">② 股票池</a>
+        <a href="#td-sec-summary">③ 说明</a>
+      </nav>
+      <div class="rv-actions">
+        <span id="tdState" class="rv-state-text">加载中...</span>
+        <span class="rv-spacer"></span>
+        <button id="tdMode" type="button">精简模式</button>
+      </div>
+
+      <div class="rv-hero" id="tdHero"></div>
+
+      <section class="panel" id="td-sec-systems">
+        <h2>一、可执行交易系统（回测验证）</h2>
+        <div id="tdSystems"></div>
+        <p id="tdUnused" class="rv-text"></p>
+      </section>
+
+      <section class="panel" id="td-sec-pool">
+        <h2>二、基于交易系统的实时股票池</h2>
+        <p id="tdPoolState" class="rv-text"></p>
+        <div id="tdPool"></div>
+      </section>
+
+      <section class="panel" id="td-sec-summary">
+        <h2>使用说明与风险提示</h2>
+        <div id="tdSummary"></div>
       </section>
     </section>
 
