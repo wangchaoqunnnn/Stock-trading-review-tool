@@ -85,7 +85,7 @@ function renderPool(d) {
         <tbody>${tbody}</tbody>
       </table>`;
   }).join("");
-  $("tdPool").innerHTML = blocks || `<div class="subtitle">当前无符合系统的信号股（盘中信号少属正常）</div>`;
+  $("tdPool").innerHTML = blocks || `<div class="subtitle">当前无符合系统的信号股。高胜率规则天然严格（如缩量+次日放量阳线确认），命中稀少属正常；盘中/收盘后刷新或切换"有效支撑/涨停回踩"Tab 查看完整扫描结果。</div>`;
 }
 
 /* ---------- 三、说明与风险 ---------- */
@@ -128,15 +128,24 @@ function render(d) {
 
 export async function loadTrading(force = false) {
   $("tdState").textContent = "更新中...";
+  $("tdHero").innerHTML = `
+    <h3>交易策略 · 可执行交易系统与股票池</h3>
+    <div class="rv-hero-sub">正在扫描全市场构建股票池（约需 20-40 秒），请稍候...</div>
+    <div class="rv-hero-concl">回测胜率最高的系统：缩量回踩支撑 + 放量阳线确认（3日 78%）。</div>`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 120000);
   try {
     const url = apiUrl("/api/trading", force);
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: ctrl.signal });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const d = await resp.json();
     render(d);
   } catch (e) {
-    $("tdState").textContent = "刷新失败：" + e.message;
-    $("errors").textContent = "交易策略刷新失败：" + e.message;
+    const msg = e.name === "AbortError" ? "扫描超时（超过120秒），请稍后重试" : e.message;
+    $("tdState").textContent = "刷新失败：" + msg;
+    $("errors").textContent = "交易策略刷新失败：" + msg;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
