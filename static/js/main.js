@@ -19,6 +19,7 @@ import { loadSpeedRank } from "./speedrank.js";
 import { loadPullbackMa } from "./pullback_ma.js";
 import { loadSupportValid } from "./support_valid.js";
 import { loadReview } from "./review.js";
+import { loadGlobalmac } from "./globalmac.js";
 
 // Tab -> 页面元素 id / 数据加载函数
 const PAGES = {
@@ -39,6 +40,7 @@ const PAGES = {
   pullback_ma: "page-pullback_ma",
   support_valid: "page-support_valid",
   review: "page-review",
+  globalmac: "page-globalmac",
 };
 const LOADERS = {
   daily: load,
@@ -58,6 +60,7 @@ const LOADERS = {
   pullback_ma: loadPullbackMa,
   support_valid: loadSupportValid,
   review: loadReview,
+  globalmac: loadGlobalmac,
 };
 
 const REFRESH_INTERVAL = 30; // 自动刷新周期（秒）

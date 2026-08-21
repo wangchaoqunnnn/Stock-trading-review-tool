@@ -39,6 +39,7 @@
     <button class="tab" data-tab="pullback_ma" type="button">回踩支撑</button>
     <button class="tab" data-tab="support_valid" type="button">有效支撑</button>
     <button class="tab" data-tab="review" type="button">复盘总结</button>
+    <button class="tab" data-tab="globalmac" type="button">全球宏观</button>
   </nav>
 
   <nav class="mob-nav" aria-label="页面切换">
@@ -469,6 +470,69 @@
       <section class="panel" id="rv-sec-summary">
         <h2>复盘总结</h2>
         <div id="rvSummary"></div>
+      </section>
+    </section>
+
+    <section id="page-globalmac" class="page hidden">
+      <nav class="rv-nav" aria-label="全球宏观模块导航">
+        <a href="#gm-sec-indices">① 全球股指</a>
+        <a href="#gm-sec-fx">② 外汇</a>
+        <a href="#gm-sec-bonds">③ 债券</a>
+        <a href="#gm-sec-comm">④ 大宗商品</a>
+        <a href="#gm-sec-calendar">⑤ 宏观日历</a>
+        <a href="#gm-sec-linkage">⑥ 跨资产研判</a>
+        <a href="#gm-sec-summary">⑦ 总结</a>
+      </nav>
+      <div class="rv-actions">
+        <span id="gmState" class="rv-state-text">加载中...</span>
+        <span class="rv-spacer"></span>
+        <button id="gmMode" type="button">精简模式</button>
+      </div>
+
+      <div class="rv-hero" id="gmHero"></div>
+
+      <section class="panel" id="gm-sec-indices">
+        <h2>一、全球股指概览</h2>
+        <p id="gmRisk" class="rv-text" style="font-weight:700"></p>
+        <h3 class="rv-sub">富时中国A50 / 美股三大指数</h3>
+        <div id="gmA50"></div>
+        <h3 class="rv-sub">欧洲主要股指</h3>
+        <div id="gmEu"></div>
+        <h3 class="rv-sub">亚太主要股指</h3>
+        <div id="gmApac"></div>
+      </section>
+
+      <section class="panel" id="gm-sec-fx">
+        <h2>二、外汇市场动态</h2>
+        <div id="gmFx"></div>
+        <p id="gmFxVerdict" class="rv-text"></p>
+      </section>
+
+      <section class="panel" id="gm-sec-bonds">
+        <h2>三、全球债券市场</h2>
+        <div id="gmBonds"></div>
+        <p id="gmBondsVerdict" class="rv-text"></p>
+      </section>
+
+      <section class="panel" id="gm-sec-comm">
+        <h2>四、贵金属与大宗商品</h2>
+        <div id="gmComm"></div>
+        <p id="gmCommVerdict" class="rv-text"></p>
+      </section>
+
+      <section class="panel" id="gm-sec-calendar">
+        <h2>五、宏观数据与事件日历</h2>
+        <div id="gmCalendar"></div>
+      </section>
+
+      <section class="panel" id="gm-sec-linkage">
+        <h2>六、跨资产联动与宏观研判</h2>
+        <div id="gmLinkage"></div>
+      </section>
+
+      <section class="panel" id="gm-sec-summary">
+        <h2>总结与风险提示</h2>
+        <div id="gmSummary"></div>
       </section>
     </section>
 

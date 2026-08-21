@@ -881,11 +881,80 @@ def main():
     check(any("不支持历史回放" in e for e in po_h["errors"]), "历史模式标注（美股为隔夜口径）")
     check(len(po_h["indices"]) == 5, "历史参数不影响数据抓取")
 
+    print("== globalmac 离线扫描 ==")
+    import stockreview.globalmac as gm_mod
+
+    def fake_ulist(secids):
+        m = {
+            "100.UDI": ("美元指数", 98.8, 0.03, 98.79),
+            "119.USDJPY": ("美元兑日元", 158.9, 0.1, 158.7),
+            "119.EURUSD": ("欧元兑美元", 1.168, 0.09, 1.167),
+            "119.GBPUSD": ("英镑兑美元", 1.364, 0.11, 1.363),
+            "133.USDCNH": ("美元兑离岸人民币", 6.724, -0.05, 6.727),
+            "100.FTSE": ("英国富时100", 10700.0, 0.3, 10668.0),
+            "100.GDAXI": ("德国DAX30", 26000.0, 0.4, 25896.0),
+            "100.FCHI": ("法国CAC40", 8450.0, 0.2, 8433.0),
+            "100.N225": ("日经225", 66000.0, 0.5, 65672.0),
+            "100.KS11": ("韩国KOSPI", 6900.0, 0.6, 6859.0),
+            "100.HSI": ("恒生指数", 26000.0, 0.7, 25819.0),
+            "101.GC00Y": ("COMEX黄金", 4580.0, 0.8, 4544.0),
+            "101.SI00Y": ("COMEX白银", 68.5, 1.0, 67.8),
+            "101.HG00Y": ("COMEX铜", 6.5, 0.7, 6.46),
+            "100.XIN9": ("富时中国A50", 14800.0, 0.5, 14726.0),
+            "105.SHY": ("美国国债1-3年ETF-iShares", 82.0, 0.1, 81.9),
+            "105.IEF": ("美国国债7-10年ETF-iShares", 93.2, 0.4, 92.8),
+            "105.TLT": ("美国国债20年+ETF-iShares", 82.9, 0.6, 82.4),
+        }
+        out = []
+        for s in secids:
+            if s in m:
+                n, price, pct, pre = m[s]
+                out.append({"f2": price, "f3": pct, "f12": s, "f14": n, "f17": price, "f18": pre})
+        return out
+
+    gm_mod._em_ulist = fake_ulist
+
+    def fake_quotes(codes):
+        data = {
+            "usDJI": ("道琼斯", 53100.0, 53463.0, 53381.0, 0, 0, -363.0, -0.68, 53381.0, 52995.0),
+            "usINX": ("标普500", 7685.0, 7708.0, 7690.0, 0, 0, -23.0, -0.3, 7697.0, 7672.0),
+            "usIXIC": ("纳斯达克", 26160.0, 26331.0, 26211.0, 0, 0, -171.0, -0.65, 26263.0, 26107.0),
+        }
+        q = {}
+        for c in codes:
+            if c in data:
+                n, price, pre, op, vol, amt, chg, pct, hi, lo = data[c]
+                q[c] = {"name": n, "price": price, "pre_close": pre, "open": op, "vol": vol,
+                        "amount": amt, "change": chg, "pct": pct, "high": hi, "low": lo}
+        return q
+
+    gm_mod._tencent_quotes = fake_quotes
+    gm_mod._sina_fx = lambda code, name: {"name": name, "price": 6.722, "pre_close": 6.724, "open": 6.723,
+                                          "high": 6.725, "low": 6.721, "pct": -0.03}
+    gm_mod._sina_nf = lambda code, name: {"name": name, "price": 109.5, "pre_close": 109.4, "open": 109.45,
+                                          "high": 109.6, "low": 109.3, "pct": 0.09}
+    gm_mod._sina_hf = lambda code, name: {"name": name, "price": 86.7, "pre_close": 86.5, "open": 86.6,
+                                          "high": 87.0, "low": 86.3, "pct": 0.23}
+    gm_mod.datetime = FakeDT
+    gm = gm_mod.fetch_globalmac()
+    check(len(gm["indices"]["us"]) == 3 and len(gm["indices"]["eu"]) == 3 and len(gm["indices"]["apac"]) == 3,
+          "全球股指分组完整（美股3/欧洲3/亚太3）")
+    check(gm["indices"]["a50"]["name"] == "富时中国A50" and "risk" in gm["indices"]["risk"], "A50与风险偏好")
+    check(len(gm["fx"]["rows"]) == 6, f"外汇6品种（含在岸/离岸人民币）实际{len(gm['fx']['rows'])}")
+    check(len(gm["bonds"]["rows"]) == 4 and gm["bonds"]["note"] != "" and gm["bonds"]["spread"] != "", "债券4行+口径说明+利差方向")
+    check(len(gm["commodities"]["rows"]) == 7, f"大宗7品种（黄金白银铜油碳酸锂）实际{len(gm['commodities']['rows'])}")
+    check(gm["commodities"]["verdict"] != "", "大宗强弱总结")
+    check(gm["calendar"]["note"] != "" and gm["calendar"]["focus"] != "", "宏观日历说明")
+    check(gm["linkage"]["phase"] != "" and gm["linkage"]["contradiction"] != "", "宏观阶段与矛盾")
+    check("不构成任何投资建议" in gm["risk"], "风险提示")
+    gm_h = gm_mod.fetch_globalmac(date="2026-08-14")
+    check(any("不支持历史回放" in e for e in gm_h["errors"]), "历史参数标注")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

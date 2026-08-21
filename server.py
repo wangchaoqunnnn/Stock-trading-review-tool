@@ -20,6 +20,7 @@ from stockreview.breakout import fetch_breakout_scan
 from stockreview.config import DEFAULT_PORT, STATIC_DIR
 from stockreview.emotion_history import fetch_emotion_history
 from stockreview.flow3 import fetch_flow3_scan
+from stockreview.globalmac import fetch_globalmac
 from stockreview.heatmap import fetch_heatmap_scan
 from stockreview.hot import fetch_hot_scan
 from stockreview.leaders import fetch_leaders_scan
@@ -68,6 +69,8 @@ SUPPORT_VALID_CACHE = SnapshotCache(ttl=600, fetcher=fetch_support_valid_scan)
 REVIEW_CACHE = SnapshotCache(ttl=600, fetcher=fetch_review)
 # 开盘前瞻：隔夜美股+外围，10 分钟缓存
 PREOPEN_CACHE = SnapshotCache(ttl=600, fetcher=fetch_preopen)
+# 全球宏观：跨市场聚合，10 分钟缓存
+GLOBALMAC_CACHE = SnapshotCache(ttl=600, fetcher=fetch_globalmac)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -223,6 +226,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(PREOPEN_CACHE, date)
         elif path == "/api/preopen_refresh":
             self._serve(PREOPEN_CACHE, date, force=True)
+        elif path == "/api/globalmac":
+            self._serve(GLOBALMAC_CACHE, date)
+        elif path == "/api/globalmac_refresh":
+            self._serve(GLOBALMAC_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:
