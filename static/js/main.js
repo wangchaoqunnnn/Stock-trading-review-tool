@@ -1,4 +1,4 @@
-/* ---------- 应用入口：Tab 切换、自动刷新（带倒计时）、按钮事件 ---------- */
+/* ---------- 应用入口：两级导航（一级分区 + 二级页面）、自动刷新、按钮事件 ---------- */
 
 import { $ } from "./utils.js";
 import { auto, toggleAuto, selectedDate, setSelectedDate } from "./state.js";
@@ -22,8 +22,8 @@ import { loadReview } from "./review.js";
 import { loadGlobalmac } from "./globalmac.js";
 import { loadTrading } from "./trading.js";
 
-// Tab -> 页面元素 id / 数据加载函数
-const PAGES = {
+// 页面 -> 元素 id
+const PAGE_IDS = {
   daily: "page-daily",
   preopen: "page-preopen",
   realtime: "page-realtime",
@@ -44,6 +44,8 @@ const PAGES = {
   globalmac: "page-globalmac",
   trading: "page-trading",
 };
+
+// 页面 -> 数据加载函数
 const LOADERS = {
   daily: load,
   preopen: loadPreopen,
@@ -66,75 +68,55 @@ const LOADERS = {
   trading: loadTrading,
 };
 
+// 一级分区 -> 二级页面列表（按交易时段 + 业务用途组织）
+const SECTIONS = {
+  preopen: { label: "开盘前瞻", default: "preopen", pages: ["preopen", "globalmac"] },
+  realtime: { label: "实时盘口", default: "realtime", pages: ["realtime", "ztpool", "speedrank", "hot"] },
+  daily: { label: "每日复盘", default: "daily", pages: ["daily", "review", "heatmap"] },
+  strategy: { label: "策略选股", default: "volprice", pages: ["volprice", "pullback", "flow3", "trend3", "limit20", "breakout", "leaders", "pullback_ma", "support_valid"] },
+  trading: { label: "交易策略", default: "trading", pages: ["trading"] },
+};
+
 const REFRESH_INTERVAL = 30; // 自动刷新周期（秒）
 
-let activeTab = "daily";
+let activeSection = "preopen";
+let activeTab = "preopen";
 let timer = null;
 let countdown = REFRESH_INTERVAL;
 let refreshing = false;
 
-function switchTab(name) {
+// 切换二级页面
+function switchPage(name) {
   activeTab = name;
-  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  document.querySelectorAll(".sheet-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  for (const [tab, pageId] of Object.entries(PAGES)) {
+  // 同步激活的一级分区（页面可能被跨区调用，但本应用页面属于唯一分区）
+  document.querySelectorAll(".subtab").forEach((b) => b.classList.toggle("active", b.dataset.page === name));
+  for (const [tab, pageId] of Object.entries(PAGE_IDS)) {
     $(pageId).classList.toggle("hidden", tab !== name);
   }
-  updateMobCurrent();
   // 切到非每日复盘页时立即强制刷新（保持历史行为）
   if (name !== "daily") LOADERS[name](true);
 }
 
-document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
-
-// ---- 移动端：当前页 + "全部页面"底部弹层切换 ----
-const TAB_LABELS = {};
-document.querySelectorAll(".tab").forEach((b) => {
-  TAB_LABELS[b.dataset.tab] = b.textContent.trim();
-});
-
-function updateMobCurrent() {
-  $("mobCurrent").textContent = TAB_LABELS[activeTab] || activeTab;
-}
-
-function openTabSheet() {
-  $("tabSheetMask").hidden = false;
-  $("tabSheetGrid").querySelectorAll(".sheet-tab").forEach((b) => {
-    b.classList.toggle("active", b.dataset.tab === activeTab);
+// 切换一级分区
+function switchSection(name) {
+  activeSection = name;
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.section === name));
+  // 二级导航：只显示当前一级对应的那一组，其余全部隐藏
+  document.querySelectorAll(".subnav").forEach((n) => {
+    n.classList.toggle("hidden", n.dataset.section !== name);
   });
-}
-
-function closeTabSheet() {
-  $("tabSheetMask").hidden = true;
-}
-
-function buildTabSheet() {
-  const grid = $("tabSheetGrid");
-  grid.innerHTML = "";
-  for (const name of Object.keys(PAGES)) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "sheet-tab";
-    b.dataset.tab = name;
-    b.textContent = TAB_LABELS[name] || name;
-    b.addEventListener("click", () => {
-      switchTab(name);
-      closeTabSheet();
-    });
-    grid.appendChild(b);
+  syncStickyOffsets();
+  const def = SECTIONS[name].default;
+  document.querySelectorAll(".subtab").forEach((b) => b.classList.toggle("active", b.dataset.page === def));
+  for (const [tab, pageId] of Object.entries(PAGE_IDS)) {
+    $(pageId).classList.toggle("hidden", tab !== def);
   }
+  activeTab = def;
+  LOADERS[def](true);
 }
 
-buildTabSheet();
-$("mobMoreBtn").addEventListener("click", openTabSheet);
-$("tabSheetClose").addEventListener("click", closeTabSheet);
-$("tabSheetMask").addEventListener("click", (e) => {
-  if (e.target === $("tabSheetMask")) closeTabSheet();
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeTabSheet();
-});
-updateMobCurrent();
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => switchSection(b.dataset.section)));
+document.querySelectorAll(".subtab").forEach((b) => b.addEventListener("click", () => switchPage(b.dataset.page)));
 
 // 顶部刷新状态：倒计时显示（由本模块统一管理）
 function updateCountdown() {
@@ -222,8 +204,9 @@ $("autoBtn").addEventListener("click", () => {
   updateCountdown();
 });
 
+// 初始：激活默认分区（开盘前瞻）并加载该页数据
+switchSection(activeSection);
 startAuto();
-refreshNow(true);
 
 // ---- 响应式：自动把表格包进可横向滚动容器（幂等） ----
 function wrapTables() {
@@ -239,18 +222,18 @@ function wrapTables() {
 wrapTables();
 new MutationObserver(wrapTables).observe(document.body, { childList: true, subtree: true });
 
-// ---- 固定标签栏：实测顶栏/标签栏高度，供 sticky 偏移使用 ----
+// ---- 固定导航：实测顶栏/一级标签栏/二级导航高度，供 sticky 偏移使用 ----
 function syncStickyOffsets() {
   const root = document.documentElement;
   const tb = document.querySelector(".topbar");
   const tab = document.querySelector(".tabbar");
-  const mnav = document.querySelector(".mob-nav");
+  const sub = document.querySelector(".subnav:not(.hidden)") || document.querySelector(".subnav");
   if (tb) root.style.setProperty("--topbar-h", tb.offsetHeight + "px");
-  // 移动端 tabbar 隐藏时用 mob-nav 高度
-  let navH = 0;
-  if (tab && getComputedStyle(tab).display !== "none") navH = tab.offsetHeight;
-  else if (mnav && getComputedStyle(mnav).display !== "none") navH = mnav.offsetHeight;
-  if (navH > 0) root.style.setProperty("--tabbar-h", navH + "px");
+  if (tab && getComputedStyle(tab).display !== "none") {
+    root.style.setProperty("--tabbar-h", tab.offsetHeight + "px");
+  }
+  const subH = sub && getComputedStyle(sub).display !== "none" ? sub.offsetHeight : 0;
+  root.style.setProperty("--subnav-h", subH + "px");
 }
 syncStickyOffsets();
 window.addEventListener("resize", syncStickyOffsets);

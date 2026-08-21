@@ -21,31 +21,43 @@
     </div>
   </header>
 
-  <nav class="tabbar">
-    <button class="tab active" data-tab="daily" type="button">每日复盘</button>
-    <button class="tab" data-tab="preopen" type="button">开盘前瞻</button>
-    <button class="tab" data-tab="realtime" type="button">实时盘口</button>
-    <button class="tab" data-tab="volprice" type="button">量价异动</button>
-    <button class="tab" data-tab="pullback" type="button">涨停回踩</button>
-    <button class="tab" data-tab="flow3" type="button">3日资金</button>
-    <button class="tab" data-tab="trend3" type="button">放量阳线</button>
-    <button class="tab" data-tab="limit20" type="button">涨停横盘</button>
-    <button class="tab" data-tab="ztpool" type="button">今日涨停</button>
-    <button class="tab" data-tab="hot" type="button">市场热度</button>
-    <button class="tab" data-tab="breakout" type="button">突破新高</button>
-    <button class="tab" data-tab="leaders" type="button">龙头股</button>
-    <button class="tab" data-tab="heatmap" type="button">市场情绪</button>
-    <button class="tab" data-tab="speedrank" type="button">涨速榜</button>
-    <button class="tab" data-tab="pullback_ma" type="button">回踩支撑</button>
-    <button class="tab" data-tab="support_valid" type="button">有效支撑</button>
-    <button class="tab" data-tab="review" type="button">复盘总结</button>
-    <button class="tab" data-tab="globalmac" type="button">全球宏观</button>
-    <button class="tab" data-tab="trading" type="button">交易策略</button>
+  <nav class="tabbar" aria-label="一级导航">
+    <button class="tab active" data-section="preopen" type="button">开盘前瞻</button>
+    <button class="tab" data-section="realtime" type="button">实时盘口</button>
+    <button class="tab" data-section="daily" type="button">每日复盘</button>
+    <button class="tab" data-section="strategy" type="button">策略选股</button>
+    <button class="tab" data-section="trading" type="button">交易策略</button>
   </nav>
 
-  <nav class="mob-nav" aria-label="页面切换">
-    <span class="mob-current" id="mobCurrent">每日复盘</span>
-    <button type="button" class="mob-more" id="mobMoreBtn">全部页面 <span class="mob-more-arrow">▾</span></button>
+  <!-- 二级导航（每组一个，切换一级时显示对应组） -->
+  <nav class="subnav" id="subnav-preopen" data-section="preopen" aria-label="开盘前瞻二级导航">
+    <button class="subtab active" data-page="preopen" type="button">开盘前瞻</button>
+    <button class="subtab" data-page="globalmac" type="button">全球宏观</button>
+  </nav>
+  <nav class="subnav hidden" id="subnav-realtime" data-section="realtime" aria-label="实时盘口二级导航">
+    <button class="subtab active" data-page="realtime" type="button">实时盘口</button>
+    <button class="subtab" data-page="ztpool" type="button">今日涨停</button>
+    <button class="subtab" data-page="speedrank" type="button">涨速榜</button>
+    <button class="subtab" data-page="hot" type="button">市场热度</button>
+  </nav>
+  <nav class="subnav hidden" id="subnav-daily" data-section="daily" aria-label="每日复盘二级导航">
+    <button class="subtab active" data-page="daily" type="button">每日复盘</button>
+    <button class="subtab" data-page="review" type="button">复盘总结</button>
+    <button class="subtab" data-page="heatmap" type="button">市场情绪</button>
+  </nav>
+  <nav class="subnav hidden" id="subnav-strategy" data-section="strategy" aria-label="策略选股二级导航">
+    <button class="subtab active" data-page="volprice" type="button">量价异动</button>
+    <button class="subtab" data-page="pullback" type="button">涨停回踩</button>
+    <button class="subtab" data-page="flow3" type="button">3日资金</button>
+    <button class="subtab" data-page="trend3" type="button">放量阳线</button>
+    <button class="subtab" data-page="limit20" type="button">涨停横盘</button>
+    <button class="subtab" data-page="breakout" type="button">突破新高</button>
+    <button class="subtab" data-page="leaders" type="button">龙头股</button>
+    <button class="subtab" data-page="pullback_ma" type="button">回踩支撑</button>
+    <button class="subtab" data-page="support_valid" type="button">有效支撑</button>
+  </nav>
+  <nav class="subnav hidden" id="subnav-trading" data-section="trading" aria-label="交易策略二级导航">
+    <button class="subtab active" data-page="trading" type="button">交易策略</button>
   </nav>
 
   <main>
@@ -570,16 +582,6 @@
 
     <section id="errors" class="errors"></section>
   </main>
-
-  <div class="sheet-mask" id="tabSheetMask" hidden>
-    <div class="tab-sheet" role="dialog" aria-modal="true" aria-label="切换页面">
-      <div class="tab-sheet-head">
-        <span>切换页面</span>
-        <button type="button" class="tab-sheet-close" id="tabSheetClose">✕</button>
-      </div>
-      <div class="tab-sheet-grid" id="tabSheetGrid"></div>
-    </div>
-  </div>
 
   <script type="module" src="/js/main.js"></script>
 </body>

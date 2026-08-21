@@ -418,71 +418,43 @@ th.sortable.active {
   -webkit-overflow-scrolling: touch;
 }
 
-/* ---------- 移动端页面切换：底部弹层 ---------- */
-.mob-nav { display: none; }
-
-.sheet-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
+/* ---------- 二级导航（subnav）：固定，仅当前一级激活时显示对应组 ---------- */
+.subnav {
+  position: sticky;
+  top: calc(var(--topbar-h, 50px) + var(--tabbar-h, 47px));
+  z-index: 7;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
+  gap: 6px;
+  padding: 8px 18px;
+  max-width: 1600px;
+  margin: 0 auto;
+  background: rgba(18, 22, 31, 0.95);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
-.sheet-mask[hidden] { display: none; }
-
-.tab-sheet {
-  width: 100%;
-  max-width: 640px;
-  max-height: 78vh;
-  overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px 14px 0 0;
-  padding: 12px 14px calc(16px + env(safe-area-inset-bottom));
-  animation: sheetUp 0.18s ease-out;
-}
-@keyframes sheetUp {
-  from { transform: translateY(30px); opacity: 0.4; }
-  to { transform: none; opacity: 1; }
-}
-
-.tab-sheet-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  font-weight: 700;
-  font-size: 14px;
-}
-.tab-sheet-close { padding: 4px 10px; font-size: 13px; line-height: 1; }
-
-.tab-sheet-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.sheet-tab {
-  padding: 11px 6px;
-  font-size: 13px;
-  border-radius: 8px;
-  text-align: center;
-  background: #1a2130;
+.subnav::-webkit-scrollbar { display: none; }
+.subnav.hidden { display: none; }
+.subtab {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  border-radius: 999px;
+  background: transparent;
   color: var(--muted);
+  border: 1px solid transparent;
+  white-space: nowrap;
 }
-.sheet-tab.active {
-  border-color: var(--accent);
+.subtab:hover { color: var(--text); border-color: var(--border); }
+.subtab.active {
   color: var(--accent);
-  background: rgba(76, 141, 255, 0.08);
+  border-color: var(--accent);
+  background: rgba(76, 141, 255, 0.1);
 }
-
-.mob-current { font-size: 14px; font-weight: 700; color: var(--text); }
-.mob-more { padding: 6px 12px; font-size: 12px; }
-.mob-more-arrow { margin-left: 4px; font-size: 10px; }
 
 /* ---------- 复盘总结页 ---------- */
-#page-review, #page-preopen, #page-globalmac, #page-trading { --rv-top: calc(var(--topbar-h, 50px) + var(--tabbar-h, 47px)); }
+#page-review, #page-preopen, #page-globalmac, #page-trading { --rv-top: calc(var(--topbar-h, 50px) + var(--tabbar-h, 47px) + var(--subnav-h, 0px)); }
 section[id^="rv-sec-"], section[id^="po-sec-"], section[id^="gm-sec-"], section[id^="td-sec-"] { scroll-margin-top: calc(var(--rv-top, 52px) + 14px); }
 #page-review.brief .rv-extra, #page-preopen.brief .rv-extra, #page-globalmac.brief .rv-extra, #page-trading.brief .rv-extra { display: none; }
 
@@ -672,19 +644,14 @@ section[id^="rv-sec-"], section[id^="po-sec-"], section[id^="gm-sec-"], section[
   .actions { gap: 6px; }
   .actions button { padding: 6px 10px; font-size: 12px; }
 
-  .tabbar { display: none; }
-  .mob-nav {
-    position: sticky;
-    top: var(--topbar-h, 50px);
-    z-index: 8;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 8px 12px;
-    background: rgba(11, 14, 20, 0.95);
-    border-bottom: 1px solid var(--border);
+  .tabbar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    padding: 10px 12px 0;
   }
+  .tab { display: inline-block; padding: 8px 12px; flex: 0 0 auto; }
+  .subnav { padding: 6px 12px; top: calc(var(--topbar-h, 50px) + var(--tabbar-h, 47px)); }
 
   main { padding: 10px 10px 26px; }
   .panel { padding: 10px; margin-bottom: 10px; }
