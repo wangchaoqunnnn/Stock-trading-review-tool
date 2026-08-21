@@ -16,6 +16,7 @@
 - 美股个股成交额不可得，中概资金流向以中概 ETF 表现与涨跌结构近似。
 """
 import re
+import time
 import urllib.parse
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -100,24 +101,30 @@ _US_FIELDS = "f2,f3,f6,f12,f14,f100"
 
 
 def _us_universe():
-    """美股全市场（东财 m:105）并行翻页，返回原始行列表。"""
-    first = http_get_json(clist_url("m:105", _US_FIELDS, fid="f3", po=1, pn=1, pz=200),
+    """美股全市场（东财 m:105）并行翻页，返回原始行列表。
+
+    注意：美股 clist 单页上限为 100 行（pz 传 200 也只返回 100），
+    必须按 total/100 翻页，否则会漏掉一半（全部下跌股）。
+    """
+    page_size = 100
+    first = http_get_json(clist_url("m:105", _US_FIELDS, fid="f3", po=1, pn=1, pz=page_size),
                           headers={"Referer": "https://quote.eastmoney.com/"})
     data = first.get("data") or {}
     total = int(data.get("total") or 0)
     rows = list(data.get("diff") or [])
-    pages = max(1, (total + 199) // 200)
+    pages = max(1, (total + page_size - 1) // page_size)
 
     def one(pn):
-        for attempt in range(2):
+        for attempt in range(3):
             try:
-                d = http_get_json(clist_url("m:105", _US_FIELDS, fid="f3", po=1, pn=pn, pz=200),
+                d = http_get_json(clist_url("m:105", _US_FIELDS, fid="f3", po=1, pn=pn, pz=page_size),
                                   headers={"Referer": "https://quote.eastmoney.com/"})
                 diff = (d.get("data") or {}).get("diff") or []
                 if diff:
                     return diff
             except Exception:
                 pass
+            time.sleep(0.2)
         return []
 
     with ThreadPoolExecutor(max_workers=8) as ex:
@@ -180,7 +187,7 @@ def _us_breadth(rows):
 
 
 def _us_sectors(rows):
-    """美股行业板块（GICS 一级行业聚合，成分数≥5；涨幅取中位数抗极端值）。"""
+    """美股行业板块（GICS 一级行业聚合，成分数≥5；涨幅取剔除极端值后的等权均值）。"""
     groups = defaultdict(list)
     for r in rows:
         ind = r.get("f100")
@@ -194,20 +201,19 @@ def _us_sectors(rows):
     for ind, items in groups.items():
         if len(items) < 5:
             continue
-        pcts = [p for p, _ in items]
-        pcts_sorted = sorted(pcts)
-        mid = len(pcts_sorted) // 2
-        median = pcts_sorted[mid] if len(pcts_sorted) % 2 else (pcts_sorted[mid - 1] + pcts_sorted[mid]) / 2
-        leader = max(items, key=lambda x: x[0])
+        # 剔除 |涨跌幅|>50 的异常值（多为不流动微盘股/权证），避免单只扭曲板块
+        valid = [(p, r) for p, r in items if abs(p) <= 50] or items
+        pcts = [p for p, _ in valid]
+        leader = max(valid, key=lambda x: x[0])
         up = sum(1 for p in pcts if p > 0)
         amt = 0.0
-        for _, r in items:
+        for _, r in valid:
             v = to_num(r.get("f6"))
             if v == v:
                 amt += v
         out.append({
-            "name": ind, "pct": round(median, 2),
-            "up": up, "down": len(items) - up, "count": len(items),
+            "name": ind, "pct": round(sum(pcts) / len(pcts), 2),
+            "up": up, "down": len(valid) - up, "count": len(valid),
             "leader": leader[1].get("f14"), "leader_pct": round(leader[0], 2),
             "amount_yi": round(amt / 100000000, 2),
         })

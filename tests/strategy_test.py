@@ -859,10 +859,10 @@ def main():
     check(b["total_amt_yi"] == 16.0, f"个股成交合计 16 亿（NaN 不计）实际 {b['total_amt_yi']}")
     check(po["market"]["rating"]["level"] in ("极寒", "偏冷", "温和", "火热"), "赚钱效应评级")
     sec_top = po["sectors"]["top"]
-    check(sec_top[0]["name"] == "能源" and sec_top[0]["pct"] == 1.0, "板块涨幅取中位数（能源1.0，妖股不扭曲）")
+    check(sec_top[0]["name"] == "能源" and abs(sec_top[0]["pct"] - 1.12) < 0.02, "板块涨幅取剔除极端值均值（能源≈1.12）")
     info = next(s for s in sec_top if s["name"] == "信息技术")
-    check(info["pct"] == 0.55, f"信息技术中位数 0.55（均值会被妖股拉到 12.2）实际 {info['pct']}")
-    check(info["leader"] == "妖股" and info["leader_pct"] == 90.0, "板块领涨龙头=组内涨幅最大者")
+    check(abs(info["pct"] - 1.06) < 0.02, f"信息技术剔除妖股后均值≈1.06（含妖股为12.2）实际 {info['pct']}")
+    check(info["leader"] == "辛软" and info["leader_pct"] == 6.0, "板块领涨龙头=剔除极端值后的组内最大者（妖股+90%被剔除）")
     check("能源板块领涨" in po["sectors"]["feature"], "板块特征")
     cn_groups = {g["group"]: g["avg_pct"] for g in po["cn"]["groups"]}
     check(abs(cn_groups["互联网"] + 2.51) < 0.01 and abs(cn_groups["新能源车"] + 0.08) < 0.01, "中概分组均值")
