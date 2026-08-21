@@ -112,32 +112,19 @@ def _sys2_row(r):
     }
 
 
-def fetch_trading(date=None):
-    """交易策略主函数：交易系统定义 + 实时信号股票池。"""
-    errors = []
-
-    def safe(name, fn):
-        try:
-            return name, fn()
-        except Exception as exc:
-            return name, {"error": f"{type(exc).__name__}: {exc}"}
-
-    with ThreadPoolExecutor(max_workers=2) as ex:
-        f1 = ex.submit(safe, "sys1", lambda: fetch_support_valid_scan(date))
-        f2 = ex.submit(safe, "sys2", lambda: fetch_pullback_scan(date))
-        r1 = f1.result()[1]
-        r2 = f2.result()[1]
-
+def build_trading(sv, pb, date=None, errors=None):
+    """由两个策略扫描结果组装交易策略响应（供 server 复用缓存）。"""
+    errors = list(errors or [])
     pool = []
-    if isinstance(r1, dict) and "error" in r1:
-        errors.append(r1.get("error"))
+    if isinstance(sv, dict) and "error" in sv:
+        errors.append(sv.get("error"))
     else:
-        for s in (r1.get("stocks") or [])[:30]:
+        for s in (sv.get("stocks") or [])[:30]:
             pool.append(_sys1_row(s))
-    if isinstance(r2, dict) and "error" in r2:
-        errors.append(r2.get("error"))
+    if isinstance(pb, dict) and "error" in pb:
+        errors.append(pb.get("error"))
     else:
-        for s in (r2.get("stocks") or [])[:30]:
+        for s in (pb.get("stocks") or [])[:30]:
             pool.append(_sys2_row(s))
 
     # 去重（同代码多系统命中保留先者）
@@ -159,3 +146,22 @@ def fetch_trading(date=None):
         "risk": RISK_TEXT,
         "errors": errors,
     }
+
+
+def fetch_trading(date=None):
+    """交易策略主函数：并行扫描两个策略模块后组装。"""
+    errors = []
+
+    def safe(name, fn):
+        try:
+            return name, fn()
+        except Exception as exc:
+            return name, {"error": f"{type(exc).__name__}: {exc}"}
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f1 = ex.submit(safe, "sys1", lambda: fetch_support_valid_scan(date))
+        f2 = ex.submit(safe, "sys2", lambda: fetch_pullback_scan(date))
+        r1 = f1.result()[1]
+        r2 = f2.result()[1]
+
+    return build_trading(r1, r2, date=date, errors=errors)

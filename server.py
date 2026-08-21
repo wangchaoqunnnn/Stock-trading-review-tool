@@ -33,7 +33,7 @@ from stockreview.review import fetch_review
 from stockreview.snapshot import fetch_snapshot
 from stockreview.speedrank import fetch_speedrank_scan
 from stockreview.support_valid import fetch_support_valid_scan
-from stockreview.trading import fetch_trading
+from stockreview.trading import build_trading, fetch_trading
 from stockreview.trend3 import fetch_trend3_scan
 from stockreview.volprice import fetch_volume_price_scan
 from stockreview.ztpool import fetch_ztpool_detail
@@ -72,8 +72,16 @@ REVIEW_CACHE = SnapshotCache(ttl=600, fetcher=fetch_review)
 PREOPEN_CACHE = SnapshotCache(ttl=600, fetcher=fetch_preopen)
 # 全球宏观：跨市场聚合，10 分钟缓存
 GLOBALMAC_CACHE = SnapshotCache(ttl=600, fetcher=fetch_globalmac)
-# 交易策略：扫描类聚合，10 分钟缓存
-TRADING_CACHE = SnapshotCache(ttl=600, fetcher=fetch_trading)
+# 交易策略：复用"有效支撑/涨停回踩"缓存，避免重复全市场扫描（缓存命中秒回）
+def _trading_fetcher(date=None):
+    if date:
+        return fetch_trading(date)  # 历史回放：独立按日期扫描
+    sv = SUPPORT_VALID_CACHE.get()
+    pb = PULLBACK_CACHE.get()
+    return build_trading(sv, pb)
+
+
+TRADING_CACHE = SnapshotCache(ttl=600, fetcher=_trading_fetcher)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
