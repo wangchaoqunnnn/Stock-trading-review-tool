@@ -21,6 +21,7 @@ import { loadSupportValid } from "./support_valid.js";
 import { loadReview } from "./review.js";
 import { loadGlobalmac } from "./globalmac.js";
 import { loadTrading } from "./trading.js";
+import { loadTactics } from "./tactics.js";
 
 // 页面 -> 元素 id
 const PAGE_IDS = {
@@ -43,6 +44,7 @@ const PAGE_IDS = {
   review: "page-review",
   globalmac: "page-globalmac",
   trading: "page-trading",
+  tactics: "page-tactics",
 };
 
 // 页面 -> 数据加载函数
@@ -66,6 +68,7 @@ const LOADERS = {
   review: loadReview,
   globalmac: loadGlobalmac,
   trading: loadTrading,
+  tactics: loadTactics,
 };
 
 // 一级分区 -> 二级页面列表（按交易时段 + 业务用途组织）
@@ -74,7 +77,7 @@ const SECTIONS = {
   realtime: { label: "实时盘口", default: "realtime", pages: ["realtime", "ztpool", "speedrank", "hot"] },
   daily: { label: "每日复盘", default: "daily", pages: ["daily", "review", "heatmap"] },
   strategy: { label: "策略选股", default: "volprice", pages: ["volprice", "pullback", "flow3", "trend3", "limit20", "breakout", "leaders", "pullback_ma", "support_valid"] },
-  trading: { label: "交易策略", default: "trading", pages: ["trading"] },
+  trading: { label: "交易策略", default: "trading", pages: ["trading", "tactics"] },
 };
 
 const REFRESH_INTERVAL = 30; // 自动刷新周期（秒）

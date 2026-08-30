@@ -58,6 +58,7 @@
   </nav>
   <nav class="subnav hidden" id="subnav-trading" data-section="trading" aria-label="交易策略二级导航">
     <button class="subtab active" data-page="trading" type="button">交易策略</button>
+    <button class="subtab" data-page="tactics" type="button">战法选股</button>
   </nav>
 
   <main>
@@ -577,6 +578,43 @@
       <section class="panel" id="td-sec-summary">
         <h2>使用说明与风险提示</h2>
         <div id="tdSummary"></div>
+      </section>
+    </section>
+
+    <section id="page-tactics" class="page hidden">
+      <nav class="rv-nav" aria-label="战法选股模块导航">
+        <a href="#tc-sec-n">N字战法</a>
+        <a href="#tc-sec-b">突破战法</a>
+        <a href="#tc-sec-pool">信号个股</a>
+        <a href="#tc-sec-rule">使用规则</a>
+      </nav>
+      <div class="rv-actions">
+        <span id="tcState" class="rv-state-text">加载中...</span>
+        <span class="rv-spacer"></span>
+        <button id="tcMode" type="button">精简模式</button>
+      </div>
+
+      <div class="rv-hero" id="tcHero"></div>
+
+      <section class="panel" id="tc-sec-n">
+        <h2>一、N字战法（低吸反转 · 赔率型）</h2>
+        <div id="tcN"></div>
+      </section>
+
+      <section class="panel" id="tc-sec-b">
+        <h2>二、突破战法（趋势主升 · 胜率型）</h2>
+        <div id="tcB"></div>
+      </section>
+
+      <section class="panel" id="tc-sec-pool">
+        <h2>三、实时信号个股（买入逻辑 / 止损价 / 建议仓位）</h2>
+        <p id="tcPoolState" class="rv-text"></p>
+        <div id="tcPool"></div>
+      </section>
+
+      <section class="panel" id="tc-sec-rule">
+        <h2>四、两套系统职业配套规则</h2>
+        <div id="tcRule"></div>
       </section>
     </section>
 

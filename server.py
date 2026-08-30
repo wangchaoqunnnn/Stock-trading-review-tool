@@ -33,6 +33,7 @@ from stockreview.review import fetch_review
 from stockreview.snapshot import fetch_snapshot
 from stockreview.speedrank import fetch_speedrank_scan
 from stockreview.support_valid import fetch_support_valid_scan
+from stockreview.tactics import fetch_tactics
 from stockreview.trading import build_trading, fetch_trading
 from stockreview.trend3 import fetch_trend3_scan
 from stockreview.volprice import fetch_volume_price_scan
@@ -82,6 +83,8 @@ def _trading_fetcher(date=None):
 
 
 TRADING_CACHE = SnapshotCache(ttl=600, fetcher=_trading_fetcher)
+# 战法选股：全市场扫描较重，10 分钟缓存
+TACTICS_CACHE = SnapshotCache(ttl=600, fetcher=fetch_tactics)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -245,6 +248,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(TRADING_CACHE, date)
         elif path == "/api/trading_refresh":
             self._serve(TRADING_CACHE, date, force=True)
+        elif path == "/api/tactics":
+            self._serve(TACTICS_CACHE, date)
+        elif path == "/api/tactics_refresh":
+            self._serve(TACTICS_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

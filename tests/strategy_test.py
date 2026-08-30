@@ -978,11 +978,85 @@ def main():
           "系统2信号：涨停回踩+板块")
     check("不构成任何投资建议" in td["risk"], "风险提示")
 
+    print("== tactics 离线扫描 ==")
+    import stockreview.tactics as tc_mod
+
+    # 构造 N 字形态 K 线（50根）：前段横盘 → 起涨低点 9.5 → 拉升+26% → 缩量回调5天 → 今日放量阳线上穿MA5
+    def n_hist():
+        rows = []
+        close = 10.2
+        for i in range(35):  # 前段窄幅震荡
+            close = 10.2 + 0.2 * ((i % 4) - 1.5) / 1.5
+            rows.append({"date": f"d{i}", "open": close * 1.002, "close": close,
+                         "high": close * 1.01, "low": close * 0.99, "volume": 1.0e6})
+        close = 9.5  # 起涨低点
+        rows.append({"date": "d35", "open": 9.7, "close": 9.5,
+                     "high": 9.8, "low": 9.4, "volume": 1.0e6})
+        base_vol = 1.0e6
+        for i in range(8):  # 拉升 8 天：9.5 -> ~12.0（+26%）
+            close = close * 1.03
+            rows.append({"date": f"d{36 + i}", "open": close / 1.02, "close": close,
+                         "high": close * 1.01, "low": close * 0.99, "volume": base_vol * 1.5})
+        for i in range(5):  # 回调 5 天：缩量回落
+            close = close * 0.99
+            rows.append({"date": f"d{44 + i}", "open": close * 1.002, "close": close,
+                         "high": close * 1.005, "low": close * 0.995, "volume": base_vol * 0.6})
+        prev = close  # 今日：放量阳线（vol=2倍前5日均量）上穿MA5
+        close = prev * 1.04
+        rows.append({"date": "d49", "open": prev * 1.005, "close": close,
+                     "high": close * 1.01, "low": prev * 0.995, "volume": base_vol * 2.0})
+        return rows
+
+    # 突破形态 K 线（45根）：横盘 20 天（10.0~10.5，振幅<15%）→ 今日放量突破
+    def b_hist():
+        rows = []
+        for i in range(38):
+            c = 10.2 + 0.3 * ((i % 4) - 1.5) / 1.5
+            rows.append({"date": f"bd{i}", "open": c * 0.998, "close": c,
+                         "high": c * 1.008, "low": c * 0.992, "volume": 8.0e5})
+        rows.append({"date": "bd38", "open": 10.4, "close": 10.9,
+                     "high": 11.0, "low": 10.35, "volume": 2.0e6})
+        return rows
+
+    def flat_hist():
+        rows = []
+        c = 8.0
+        for i in range(50):
+            c = c * 1.002
+            rows.append({"date": f"fd{i}", "open": c * 0.998, "close": c,
+                         "high": c * 1.01, "low": c * 0.99, "volume": 1.0e6})
+        return rows
+
+    KLINE = {"600001": n_hist(), "600002": b_hist(), "600003": flat_hist()}
+    tc_mod.em.fetch_kline_hist = lambda code, limit=45, end_date=None: [dict(x) for x in KLINE.get(str(code), [])]
+    tc_mod.net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=6000: [
+        stock_row("600001", "甲科技", 4.0, 8.0e8, 1.4, 1.0e8),
+        stock_row("600002", "乙材料", 3.5, 8.0e8, 2.0, 1.0e8),
+        stock_row("600003", "丙平走", 1.0, 8.0e8, 1.0, 1.0e8),
+        stock_row("600004", "丁缩量", -2.0, 8.0e8, 0.8, 1.0e8),  # 下跌排除
+    ]
+    tc_mod.em.fetch_zt_pool = lambda: {"tc": 60, "pool": [{"c": "600001", "fbt": 93000, "lbc": 3}]}
+    tc_mod.em.fetch_zb_pool = lambda: {"tc": 5, "pool": []}
+    tc_mod.em.fetch_dt_pool = lambda: {"tc": 2, "pool": []}
+    tc_mod.datetime = FakeDT
+    tc = tc_mod.fetch_tactics()
+    check(tc["count"] == 2, f"信号 2 只（N字+突破各1），实际 {tc['count']}")
+    s1 = next(s for s in tc["stocks"] if s["code"] == "600001")
+    s2 = next(s for s in tc["stocks"] if s["code"] == "600002")
+    check(s1["tactic_id"] == "n_shape" and "N字第三笔启动" in s1["logic"] and s1["stop"] is not None,
+          "N字信号：逻辑含第三笔启动+止损价")
+    check(s2["tactic_id"] == "breakout" and "放量突破" in s2["logic"] and abs(s2["stop"] - 10.58) < 0.01,
+          "突破信号：逻辑+止损=箱体上沿")
+    check(s1["position"] != "" and "情绪" in s1["position"], "建议仓位按情绪生成")
+    check(tc["backtest"]["n_shape"]["win3"] == "68.4%" and tc["backtest"]["breakout"]["win5"] == "53.0%",
+          "回测数据固化")
+    check("不构成任何投资建议" in tc["risk"], "风险提示")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)
