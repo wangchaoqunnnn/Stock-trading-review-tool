@@ -30,6 +30,7 @@ from stockreview.pullback_ma import fetch_pullback_ma_scan
 from stockreview.preopen import fetch_preopen
 from stockreview.realtime import fetch_realtime
 from stockreview.review import fetch_review
+from stockreview.sectormv import fetch_sector_momentum
 from stockreview.snapshot import fetch_snapshot
 from stockreview.speedrank import fetch_speedrank_scan
 from stockreview.support_valid import fetch_support_valid_scan
@@ -85,6 +86,8 @@ def _trading_fetcher(date=None):
 TRADING_CACHE = SnapshotCache(ttl=600, fetcher=_trading_fetcher)
 # 战法选股：全市场扫描较重，10 分钟缓存
 TACTICS_CACHE = SnapshotCache(ttl=600, fetcher=fetch_tactics)
+# 实时板块变动：盘中口径，30 秒缓存
+SECTORMV_CACHE = SnapshotCache(ttl=30, fetcher=fetch_sector_momentum)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -252,6 +255,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(TACTICS_CACHE, date)
         elif path == "/api/tactics_refresh":
             self._serve(TACTICS_CACHE, date, force=True)
+        elif path == "/api/sectormv":
+            self._serve(SECTORMV_CACHE, date)
+        elif path == "/api/sectormv_refresh":
+            self._serve(SECTORMV_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

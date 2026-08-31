@@ -1052,11 +1052,58 @@ def main():
           "回测数据固化")
     check("不构成任何投资建议" in tc["risk"], "风险提示")
 
+    print("== sectormv 离线扫描 ==")
+    import stockreview.sectormv as sm_mod
+
+    sm_mod._TIMELINE.clear()
+    sm_mod.em.fetch_industry_boards = lambda: [
+        {"code": "BK01", "name": "电子", "pct": 2.0, "flow_yi": 10.0, "amount_yi": 5000.0, "leader": "甲", "leader_pct": 5.0},
+        {"code": "BK02", "name": "半导体", "pct": 1.5, "flow_yi": 8.0, "amount_yi": 3000.0, "leader": "乙", "leader_pct": 4.0},
+        {"code": "BK03", "name": "银行", "pct": -1.0, "flow_yi": -5.0, "amount_yi": 2000.0, "leader": "丙", "leader_pct": -1.0},
+        {"code": "BK04", "name": "贵金属", "pct": -2.0, "flow_yi": -3.0, "amount_yi": 1000.0, "leader": "丁", "leader_pct": -2.0},
+    ]
+    sm_mod.em.fetch_concept_boards = lambda: [
+        {"code": "BK10", "name": "人工智能", "pct": 1.2, "flow_yi": 5.0, "amount_yi": 2000.0, "leader": "甲", "leader_pct": 3.0},
+    ]
+    sm_mod.em.fetch_market_amount = lambda: 11000.0  # 亿
+    sm_mod.em.fetch_indices = lambda: [
+        {"name": "上证指数", "pct": 0.74}, {"name": "深证成指", "pct": 0.5},
+    ]
+
+    def fake_speed_rows():
+        rows = []
+        for name, sp, ind in (("甲", 1.8, "电子"), ("乙", 1.5, "半导体"), ("丙", 1.2, "电子"),
+                              ("丁", -1.6, "银行"), ("戊", -1.3, "贵金属"), ("己", -1.1, "银行"),
+                              ("庚", 0.4, "食品"), ("辛", 0.2, "食品")):
+            rows.append({"f2": 10.0, "f3": 1.0, "f6": 1.0e9, "f12": "x", "f14": name,
+                         "f22": sp, "f100": ind})
+        return rows
+
+    sm_mod.net.fetch_paged = lambda fs, fields, fid="f22", po=1, limit=300: (
+        [r for r in fake_speed_rows() if (r["f22"] > 0 if po == 1 else r["f22"] < 0)])
+    sm_mod.datetime = FakeDT
+    sm = sm_mod.fetch_sector_momentum()
+    check(sm["leaders"]["top"][0]["name"] == "电子" and sm["leaders"]["bottom"][0]["name"] == "贵金属",
+          "领涨/领跌板块排序")
+    up_names = [b["name"] for b in sm["speed5"]["up"]]
+    down_names = [b["name"] for b in sm["speed5"]["down"]]
+    check("电子" in up_names and up_names[0] == "电子", f"5分钟涨速榜：电子居首 实际{up_names}")
+    check("银行" in down_names, "5分钟下跌榜含银行")
+    surge = {s["name"]: s for s in sm["surge"]}
+    check("电子" in surge and surge["电子"]["direction"] == "up" and "银行" in surge,
+          "异动板块（电子拉升/银行跳水）")
+    check(sm["attribution"]["summary"] and "电子(+0.91%)" in sm["attribution"]["summary"].replace("（", "(").replace("）", ")"),
+          "大盘归因含电子拉动（5000/11000×2.0=+0.91%）")
+    check(len(sm["timeline"]) >= len(sm["surge"]), "首次时间线记录本次异动")
+    sm2 = sm_mod.fetch_sector_momentum()
+    check(len(sm2["timeline"]) == len(sm["timeline"]), "同板块10分钟内去重，时间线不重复记录")
+    check("不构成任何投资建议" in sm["risk"], "风险提示")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc), ("sectormv", sm)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

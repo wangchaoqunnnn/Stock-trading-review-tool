@@ -5,6 +5,7 @@ import { auto, toggleAuto, selectedDate, setSelectedDate } from "./state.js";
 import { load } from "./daily.js";
 import { loadPreopen } from "./preopen.js";
 import { loadRealtime } from "./realtime.js";
+import { loadSectorMv } from "./sectormv.js";
 import { loadVolPrice } from "./volprice.js";
 import { loadPullback } from "./pullback.js";
 import { loadFlow3 } from "./flow3.js";
@@ -28,6 +29,7 @@ const PAGE_IDS = {
   daily: "page-daily",
   preopen: "page-preopen",
   realtime: "page-realtime",
+  sectormv: "page-sectormv",
   volprice: "page-volprice",
   pullback: "page-pullback",
   flow3: "page-flow3",
@@ -52,6 +54,7 @@ const LOADERS = {
   daily: load,
   preopen: loadPreopen,
   realtime: loadRealtime,
+  sectormv: loadSectorMv,
   volprice: loadVolPrice,
   pullback: loadPullback,
   flow3: loadFlow3,
@@ -74,7 +77,7 @@ const LOADERS = {
 // 一级分区 -> 二级页面列表（按交易时段 + 业务用途组织）
 const SECTIONS = {
   preopen: { label: "开盘前瞻", default: "preopen", pages: ["preopen", "globalmac"] },
-  realtime: { label: "实时盘口", default: "realtime", pages: ["realtime", "ztpool", "speedrank", "hot"] },
+  realtime: { label: "实时盘口", default: "realtime", pages: ["realtime", "sectormv", "ztpool", "speedrank", "hot"] },
   daily: { label: "每日复盘", default: "daily", pages: ["daily", "review", "heatmap"] },
   strategy: { label: "策略选股", default: "volprice", pages: ["volprice", "pullback", "flow3", "trend3", "limit20", "breakout", "leaders", "pullback_ma", "support_valid"] },
   trading: { label: "交易策略", default: "trading", pages: ["trading", "tactics"] },

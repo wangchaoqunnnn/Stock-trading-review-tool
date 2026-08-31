@@ -36,6 +36,7 @@
   </nav>
   <nav class="subnav hidden" id="subnav-realtime" data-section="realtime" aria-label="实时盘口二级导航">
     <button class="subtab active" data-page="realtime" type="button">实时盘口</button>
+    <button class="subtab" data-page="sectormv" type="button">板块变动</button>
     <button class="subtab" data-page="ztpool" type="button">今日涨停</button>
     <button class="subtab" data-page="speedrank" type="button">涨速榜</button>
     <button class="subtab" data-page="hot" type="button">市场热度</button>
@@ -615,6 +616,37 @@
       <section class="panel" id="tc-sec-rule">
         <h2>四、两套系统职业配套规则</h2>
         <div id="tcRule"></div>
+      </section>
+    </section>
+
+    <section id="page-sectormv" class="page hidden">
+      <div class="rv-actions">
+        <span id="smState" class="rv-state-text">加载中...</span>
+        <span class="rv-spacer"></span>
+      </div>
+
+      <div class="rv-hero" id="smHero"></div>
+
+      <section class="panel" id="sm-sec-attribution">
+        <h2>大盘涨跌归因</h2>
+        <p id="smAttribution" class="rv-text"></p>
+        <div id="smAttrList"></div>
+      </section>
+
+      <section class="panel" id="sm-sec-leaders">
+        <h2>当前领涨 / 领跌板块</h2>
+        <div id="smLeaders"></div>
+      </section>
+
+      <section class="panel" id="sm-sec-speed">
+        <h2>5 分钟板块涨速榜（前 5）</h2>
+        <div id="smSpeed"></div>
+      </section>
+
+      <section class="panel" id="sm-sec-surge">
+        <h2>异动板块与时间线</h2>
+        <p id="smSurgeNow" class="rv-text"></p>
+        <div id="smTimeline"></div>
       </section>
     </section>
 
