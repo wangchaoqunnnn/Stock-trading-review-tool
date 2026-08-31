@@ -4,6 +4,7 @@ import json
 import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 from .config import EM_UT, UA
 
@@ -38,18 +39,30 @@ def clist_url(fs, fields, fid="f3", po=1, pn=1, pz=100):
     return "https://push2delay.eastmoney.com/api/qt/clist/get?" + urllib.parse.urlencode(params)
 
 
-def fetch_paged(fs, fields, fid="f3", po=1, limit=600):
-    """按页拉取 clist 数据直到取满 limit 或翻完。"""
-    rows = []
-    pn = 1
-    while True:
-        url = clist_url(fs, fields, fid=fid, po=po, pn=pn, pz=100)
-        data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})["data"]
-        total = int(data["total"])
-        diff = data.get("diff") or []
-        rows.extend(diff)
-        if len(rows) >= min(total, limit) or not diff:
-            break
-        pn += 1
-        time.sleep(0.05)
-    return rows
+def fetch_paged(fs, fields, fid="f3", po=1, limit=600, workers=12):
+    """按页拉取 clist 数据直到取满 limit 或翻完。
+
+    翻页并行化（IO 密集，线程并发 ≈ 异步提速）：先取第 1 页拿 total，
+    剩余页并行抓取，显著降低大 limit（如全市场 6000 只 = 60 页）的耗时。
+    """
+    def one(pn):
+        try:
+            d = http_get_json(clist_url(fs, fields, fid=fid, po=po, pn=pn, pz=100),
+                              headers={"Referer": "https://quote.eastmoney.com/"})
+            return (d.get("data") or {}).get("diff") or []
+        except Exception:
+            return []
+
+    first = http_get_json(clist_url(fs, fields, fid=fid, po=po, pn=1, pz=100),
+                          headers={"Referer": "https://quote.eastmoney.com/"})
+    data = first.get("data") or {}
+    total = int(data.get("total") or 0)
+    rows = list(data.get("diff") or [])
+    need = min(total, limit)
+    pages = (need + 99) // 100
+    if pages <= 1 or len(rows) >= need:
+        return rows[:need]
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for part in ex.map(one, range(2, pages + 1)):
+            rows.extend(part)
+    return rows[:need]

@@ -23,9 +23,9 @@ MIN_STREAK = 3
 PRE_VOL_MIN = 1.0
 PRE_VOL_MAX = 2.5
 # 预筛：成交额下限（亿）
-MIN_AMOUNT_YI = 3.0
+MIN_AMOUNT_YI = 4.0
 # 个股K线核对上限
-STOCK_CHECK_LIMIT = 300
+STOCK_CHECK_LIMIT = 400
 
 
 def _safe(name, fn):

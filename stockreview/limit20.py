@@ -23,6 +23,8 @@ MAX_CALENDAR_DAYS = 45
 CHECK_WORKERS = 24
 # 输出上限（每个状态列表）
 STOCK_LIMIT = 100
+# K线核对上限（按成交额降序，控制响应时间）
+MAX_CHECK = 600
 
 SCAN_FIELDS = "f2,f3,f6,f8,f10,f12,f14,f17,f18,f22,f62,f184,f100"
 
@@ -142,8 +144,10 @@ def fetch_limit20_scan(date=None):
             return None
         return _classify_stock(row, info, date_index, date)
 
+    # 按成交额降序取前 MAX_CHECK 只核对（控制响应时间，涨停股池较大时）
+    codes = sorted(pool_by_code.keys(), key=lambda c: -to_num(code_map.get(c, {}).get("f6")))[:MAX_CHECK]
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
-        hits = list(ex.map(classify, list(pool_by_code.keys())))
+        hits = list(ex.map(classify, codes))
 
     matched = [x for x in hits if x is not None]
     # 先统计（全量），再按状态分组排序截断输出

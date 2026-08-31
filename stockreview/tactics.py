@@ -216,7 +216,7 @@ def fetch_tactics(date=None):
             c["hist"] = []
         return c
 
-    with ThreadPoolExecutor(max_workers=10) as ex:
+    with ThreadPoolExecutor(max_workers=20) as ex:
         candidates = list(ex.map(enrich, candidates))
 
     hits = []

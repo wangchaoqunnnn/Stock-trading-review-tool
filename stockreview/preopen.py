@@ -127,7 +127,7 @@ def _us_universe():
             time.sleep(0.2)
         return []
 
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=12) as ex:
         for part in ex.map(one, range(2, pages + 1)):
             rows.extend(part)
     return rows

@@ -73,7 +73,7 @@ def fetch_pullback_scan(date=None):
         except Exception:
             c["hist"] = []
         return c
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=16) as ex:
         candidates = list(ex.map(enrich, candidates))
 
     hot_set, _ = build_hot_sectors(industry, zt.get("pool") or [])

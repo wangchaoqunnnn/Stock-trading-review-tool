@@ -18,7 +18,7 @@ from .utils import to_num
 # 扫描字段：f22 即时涨速
 SCAN_FIELDS = "f2,f3,f5,f6,f8,f10,f12,f14,f22,f62,f100"
 TOP_N = 100
-SPEED_WORKERS = 10
+SPEED_WORKERS = 16
 
 
 def _intraday_closes(code):

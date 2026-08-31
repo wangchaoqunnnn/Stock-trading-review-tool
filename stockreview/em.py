@@ -125,25 +125,28 @@ def fetch_breadth(date=None):
 
 
 def fetch_ex_pool(path, date=None):
-    """东方财富 push2ex 池子接口（涨停池/炸板池/跌停池）翻页抓取。"""
+    """东方财富 push2ex 池子接口（涨停池/炸板池/跌停池）翻页抓取（并行）。"""
     date = date or datetime.now().strftime("%Y%m%d")
-    pool = []
-    tc = 0
-    page = 0
-    while page < 8:
+
+    def one(page):
         url = (
             f"https://push2ex.eastmoney.com/{path}?ut={EMEX_UT}&dpt=wz.ztzt"
             f"&Pageindex={page}&pagesize=100&sort=fbt%3Aasc&date={date}"
         )
-        data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})
-        d = data.get("data") or {}
-        tc = int(d.get("tc") or 0)
-        rows = d.get("pool") or []
-        pool.extend(rows)
-        if len(pool) >= tc or not rows:
-            break
-        page += 1
-        time.sleep(0.08)
+        d = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})
+        dd = d.get("data") or {}
+        return (dd.get("pool") or []), int(dd.get("tc") or 0)
+
+    first_pool, tc = one(0)
+    pool = list(first_pool)
+    pages = min(8, (max(tc, len(pool)) + 99) // 100)
+    if pages > 1 and len(pool) < tc:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            for rows, _ in ex.map(one, range(1, pages)):
+                pool.extend(rows)
+                if len(pool) >= tc:
+                    break
     return {"tc": tc, "pool": pool}
 
 

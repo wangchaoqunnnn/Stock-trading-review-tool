@@ -22,10 +22,11 @@ SHORT_WINDOW = 20
 # 长历史目标窗口（交易日，实际以可得数据为准）
 HIST_LIMIT = 250
 # 预筛：成交额下限（亿）
-MIN_AMOUNT_YI = 2.0
+MIN_AMOUNT_YI = 5.0
 # K线核对并发与输出上限
 CHECK_WORKERS = 24
 STOCK_LIMIT = 100
+MAX_CHECK = 500  # K线核对上限（按成交额降序取前 N 只，控制响应时间）
 
 
 def _safe(name, fn):
@@ -93,6 +94,7 @@ def fetch_breakout_scan(date=None):
         if to_num(r.get("f3")) > 0 and to_num(r.get("f6")) >= MIN_AMOUNT_YI * 100000000
     ]
     candidates.sort(key=lambda r: -to_num(r.get("f6")))
+    candidates = candidates[:MAX_CHECK]
 
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
         hits = list(ex.map(lambda r: _check_stock(r, date), candidates))

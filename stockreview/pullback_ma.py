@@ -18,12 +18,13 @@ from .utils import to_num
 SCAN_FIELDS = "f2,f3,f5,f6,f8,f10,f12,f14,f17,f18,f22,f62,f100"
 
 # 预筛：回踩日多为小幅波动，排除暴涨/大跌；流动性下限
-MIN_AMOUNT_YI = 2.0
+MIN_AMOUNT_YI = 3.0
 PCT_MIN = -6.0
 PCT_MAX = 5.0
 # K线核对并发与输出上限
 CHECK_WORKERS = 24
 STOCK_LIMIT = 120
+MAX_CHECK = 500  # K线核对上限（按成交额降序取前 N 只，控制响应时间）
 
 
 def _safe(name, fn):
@@ -103,6 +104,7 @@ def fetch_pullback_ma_scan(date=None):
         and to_num(r.get("f6")) >= MIN_AMOUNT_YI * 100000000
     ]
     candidates.sort(key=lambda r: -to_num(r.get("f6")))
+    candidates = candidates[:MAX_CHECK]
 
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
         hits = list(ex.map(lambda r: _check_stock(r, date), candidates))

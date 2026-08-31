@@ -17,10 +17,11 @@ from .market import fetch_market_context
 from .utils import to_num
 
 SCAN_FIELDS = "f2,f3,f5,f6,f8,f10,f12,f14,f17,f18,f22,f62,f100"
-MIN_AMOUNT_YI = 2.0
+MIN_AMOUNT_YI = 5.0
 CHECK_WORKERS = 24
 STOCK_LIMIT = 100
 MAX_LAG = 3
+MAX_CHECK = 400  # K线核对上限（按成交额降序取前 N 只，控制响应时间）
 
 
 def _safe(name, fn):
@@ -101,6 +102,7 @@ def fetch_support_valid_scan(date=None):
 
     candidates = [r for r in stocks if to_num(r.get("f6")) >= MIN_AMOUNT_YI * 100000000]
     candidates.sort(key=lambda r: -to_num(r.get("f6")))
+    candidates = candidates[:MAX_CHECK]
 
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
         hits = [x for x in ex.map(lambda r: _check_stock(r, date), candidates) if x]
