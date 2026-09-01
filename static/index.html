@@ -37,6 +37,7 @@
   <nav class="subnav hidden" id="subnav-realtime" data-section="realtime" aria-label="实时盘口二级导航">
     <button class="subtab active" data-page="realtime" type="button">实时盘口</button>
     <button class="subtab" data-page="sectormv" type="button">板块变动</button>
+    <button class="subtab" data-page="emotion_cycle" type="button">情绪周期</button>
     <button class="subtab" data-page="ztpool" type="button">今日涨停</button>
     <button class="subtab" data-page="speedrank" type="button">涨速榜</button>
     <button class="subtab" data-page="hot" type="button">市场热度</button>
@@ -647,6 +648,36 @@
         <h2>异动板块与时间线</h2>
         <p id="smSurgeNow" class="rv-text"></p>
         <div id="smTimeline"></div>
+      </section>
+    </section>
+
+    <section id="page-emotion_cycle" class="page hidden">
+      <div class="rv-actions">
+        <span id="ecState" class="rv-state-text">加载中...</span>
+        <span class="rv-spacer"></span>
+      </div>
+
+      <div class="rv-hero" id="ecHero"></div>
+
+      <section class="panel" id="ec-sec-phase">
+        <h2>当前情绪阶段</h2>
+        <div id="ecPhase"></div>
+      </section>
+
+      <section class="panel" id="ec-sec-metrics">
+        <h2>情绪量化指标</h2>
+        <div id="ecMetrics"></div>
+      </section>
+
+      <section class="panel" id="ec-sec-leader">
+        <h2>空间龙头与节点信号</h2>
+        <div id="ecLeader"></div>
+        <div id="ecNodes"></div>
+      </section>
+
+      <section class="panel" id="ec-sec-history">
+        <h2>近期情绪走势</h2>
+        <div id="ecHistory"></div>
       </section>
     </section>
 

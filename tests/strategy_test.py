@@ -1099,11 +1099,71 @@ def main():
     check(len(sm2["timeline"]) == len(sm["timeline"]), "同板块10分钟内去重，时间线不重复记录")
     check("不构成任何投资建议" in sm["risk"], "风险提示")
 
+    print("== emotion_cycle 离线扫描 ==")
+    import stockreview.emotion_cycle as ec_mod
+
+    def fake_pool(tc, lbc_rows=None):
+        pool = []
+        for c, n, lb in (lbc_rows or []):
+            pool.append({"c": c, "n": n, "lbc": lb, "fbt": 93000, "fund": 1.0e8, "zdp": 10.0, "amount": 1.0e8, "hs": 5.0})
+        return {"tc": tc, "pool": pool}
+
+    # 场景1（高潮）：涨停100/炸板10/连板6板/晋级80%/大面1/放量
+    ec_mod.em.fetch_ex_pool = lambda path, date=None: {
+        "getTopicZTPool": fake_pool(100, [("600001", "龙一", 6), ("600002", "龙二", 2)]),
+        "getTopicZBPool": fake_pool(10),
+        "getTopicDTPool": fake_pool(3),
+    }.get(path, {"tc": 0, "pool": []})
+    ec_mod.em.fetch_zt_pool = lambda: ec_mod.em.fetch_ex_pool("getTopicZTPool")
+    ec_mod.em.fetch_zb_pool = lambda: ec_mod.em.fetch_ex_pool("getTopicZBPool")
+    ec_mod.em.fetch_dt_pool = lambda: ec_mod.em.fetch_ex_pool("getTopicDTPool")
+    ec_mod._yesterday_pool = lambda date=None: ("20260831",
+        {"600001", "600002", "600003", "600004", "600005"}, {"code": "600001", "name": "龙一", "lb": 4})
+    ec_mod._today_spot = lambda codes: {
+        "600001": {"f3": 10.0}, "600002": {"f3": 10.0}, "600003": {"f3": 10.0},
+        "600004": {"f3": 10.0}, "600005": {"f3": -8.0},
+    }
+    ec_mod.em.fetch_market_amount = lambda: 25000.0
+    ec_mod._prev_amount_at = lambda s: 23000.0  # 放量
+    ec_mod.fetch_emotion_history = lambda date=None, days=10: {
+        "rows": [{"date": "2026-08-31", "score": 70.0, "level": "发酵", "zt": 60, "zhaban_rate": 15.0, "max_lb": 4, "dt": 2}]}
+    class FakeDT_WD:
+        fixed = datetime(2026, 8, 18, 10, 30, 0)  # 周二盘中 → 非盘前
+
+        @classmethod
+        def now(cls):
+            return cls.fixed
+    ec_mod.datetime = FakeDT_WD
+    ec = ec_mod.fetch_emotion_cycle()
+    check(ec["phase"] == "高潮", f"高潮场景判定 实际{ec['phase']}")
+    check(ec["metrics"]["promo_rate"] == 80.0 and ec["metrics"]["big_loss"] == 1,
+          f"晋级率80%/大面1 实际 {ec['metrics']['promo_rate']}/{ec['metrics']['big_loss']}")
+    check(any(n["type"] == "高潮点" for n in ec["nodes"]), "高潮点节点")
+    check(ec["leader"]["status"] == "up" and ec["leader"]["today"]["lb"] == 6, "龙头晋级+今日空间龙头6板")
+    check("不构成任何投资建议" in ec["risk"], "风险提示")
+
+    # 场景2（退潮+龙头跌停）：涨停20/炸板45%/连板2/大面25/缩量
+    ec_mod.em.fetch_ex_pool = lambda path, date=None: {
+        "getTopicZTPool": fake_pool(20, [("600001", "龙一", 2)]),
+        "getTopicZBPool": fake_pool(16),
+        "getTopicDTPool": fake_pool(15),
+    }.get(path, {"tc": 0, "pool": []})
+    ec_mod._yesterday_pool = lambda date=None: ("20260831",
+        {"600001", "600002"}, {"code": "600001", "name": "龙一", "lb": 5})
+    ec_mod._today_spot = lambda codes: {"600001": {"f3": -10.0}, "600002": {"f3": -9.0}}
+    ec_mod._prev_amount_at = lambda s: 26000.0  # 缩量
+    ec_mod.fetch_emotion_history = lambda date=None, days=10: {
+        "rows": [{"date": "2026-08-31", "score": 72.0, "level": "高潮", "zt": 100, "zhaban_rate": 12.0, "max_lb": 6, "dt": 1}]}
+    ec2 = ec_mod.fetch_emotion_cycle()
+    check(ec2["phase"] == "退潮", f"退潮场景判定 实际{ec2['phase']}")
+    check(any(n["type"] == "龙头跌停" for n in ec2["nodes"]), "龙头跌停节点")
+    check(ec2["leader"]["status"] == "limit_down", "昨日龙头今日跌停")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc), ("sectormv", sm)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc), ("sectormv", sm), ("emotion_cycle", ec)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

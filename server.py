@@ -19,6 +19,7 @@ from stockreview.cache import SnapshotCache
 from stockreview.breakout import fetch_breakout_scan
 from stockreview.config import DEFAULT_PORT, STATIC_DIR
 from stockreview.emotion_history import fetch_emotion_history
+from stockreview.emotion_cycle import fetch_emotion_cycle
 from stockreview.flow3 import fetch_flow3_scan
 from stockreview.globalmac import fetch_globalmac
 from stockreview.heatmap import fetch_heatmap_scan
@@ -88,6 +89,8 @@ TRADING_CACHE = SnapshotCache(ttl=600, fetcher=_trading_fetcher)
 TACTICS_CACHE = SnapshotCache(ttl=600, fetcher=fetch_tactics)
 # 实时板块变动：盘中口径，30 秒缓存
 SECTORMV_CACHE = SnapshotCache(ttl=30, fetcher=fetch_sector_momentum)
+# 情绪周期：盘中口径，30 秒缓存
+EMOTION_CYCLE_CACHE = SnapshotCache(ttl=30, fetcher=fetch_emotion_cycle)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -259,6 +262,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(SECTORMV_CACHE, date)
         elif path == "/api/sectormv_refresh":
             self._serve(SECTORMV_CACHE, date, force=True)
+        elif path == "/api/emotion_cycle":
+            self._serve(EMOTION_CYCLE_CACHE, date)
+        elif path == "/api/emotion_cycle_refresh":
+            self._serve(EMOTION_CYCLE_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:
