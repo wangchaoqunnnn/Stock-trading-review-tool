@@ -1159,11 +1159,53 @@ def main():
     check(any(n["type"] == "龙头跌停" for n in ec2["nodes"]), "龙头跌停节点")
     check(ec2["leader"]["status"] == "limit_down", "昨日龙头今日跌停")
 
+    print("== vshape 离线扫描 ==")
+    import stockreview.vshape as vs_mod
+
+    # 纯函数：V型 45 分钟构造（平台→急跌→放量回升）
+    v_closes = [10.0] * 20 + [9.95, 9.9, 9.85, 9.8, 9.75, 9.7, 9.65, 9.6, 9.62, 9.64] \
+        + [9.66, 9.68, 9.7, 9.72, 9.74, 9.76, 9.78, 9.8, 9.85, 9.9, 9.92, 9.94, 9.95, 9.96, 9.97]
+    v_amounts = [1.0e7] * 20 + [6e6] * 10 + [1.8e7] * 15
+    r = vs_mod._v_shape(v_closes, v_amounts)
+    check(r is not None and abs(r["depth"] - 4.0) < 0.2 and r["recover"] > 50 and r["vol_ratio"] > 1.5,
+          "深V命中：深度4%/收复92%/量比1.87")
+    # 单边跌不命中
+    flat = vs_mod._v_shape([10.0] * 20 + [9.9, 9.8, 9.7, 9.6, 9.5, 9.4, 9.3, 9.2] + [9.1, 9.0, 8.9, 8.8, 8.7, 8.6, 8.5, 8.4, 8.3], [1e7] * 37)
+    check(flat is None, "单边下跌不命中")
+    # 回升无量不命中
+    no_vol = vs_mod._v_shape(v_closes, [1.0e7] * 20 + [2.0e7] * 10 + [6e6] * 15)
+    check(no_vol is None, "回升不放量不命中")
+
+    # 上升趋势 K 线（close 缓升站上走高 MA20）
+    def up_hist():
+        rows = []
+        c = 10.0
+        for i in range(60):
+            c = c * 1.004
+            rows.append({"date": f"u{i}", "open": c * 0.998, "close": c,
+                         "high": c * 1.005, "low": c * 0.995, "volume": 1.0e6, "amount": 1.0e7})
+        return rows
+    tr = vs_mod._check_trend(up_hist())
+    check(tr is not None and tr["ma20"] > 0, "上升趋势命中（站上MA20且MA20走高）")
+
+    # 集成：stub 全市场/日K/分时
+    vs_mod.net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=6000: [
+        stock_row("600001", "甲科技", 0.5, 8.0e8, 1.0, 1.0e8),
+        stock_row("600002", "乙软件", -0.3, 8.0e8, 1.0, 1.0e8),
+    ]
+    vs_mod.em.fetch_kline_hist = lambda code, limit=45, end_date=None: [dict(x) for x in up_hist()]
+    vs_mod._intraday = lambda code: (list(v_closes), list(v_amounts))
+    vs_mod.datetime = FakeDT
+    vs = vs_mod.fetch_vshape()
+    check(vs["count"] == 2, f"两只均满足趋势+深V 实际{vs['count']}")
+    check(vs["stocks"][0]["depth"] > 0 and vs["stocks"][0]["ma20"] > 0, "信号字段完整")
+    check("不构成任何投资建议" in vs["risk"], "风险提示")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc), ("sectormv", sm), ("emotion_cycle", ec)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc), ("sectormv", sm), ("emotion_cycle", ec), ("vshape", vs)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

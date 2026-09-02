@@ -38,6 +38,7 @@ from stockreview.support_valid import fetch_support_valid_scan
 from stockreview.tactics import fetch_tactics
 from stockreview.trading import build_trading, fetch_trading
 from stockreview.trend3 import fetch_trend3_scan
+from stockreview.vshape import fetch_vshape
 from stockreview.volprice import fetch_volume_price_scan
 from stockreview.ztpool import fetch_ztpool_detail
 
@@ -91,6 +92,8 @@ TACTICS_CACHE = SnapshotCache(ttl=600, fetcher=fetch_tactics)
 SECTORMV_CACHE = SnapshotCache(ttl=30, fetcher=fetch_sector_momentum)
 # 情绪周期：盘中口径，30 秒缓存
 EMOTION_CYCLE_CACHE = SnapshotCache(ttl=30, fetcher=fetch_emotion_cycle)
+# V字洗盘：扫描类，10 分钟缓存
+VSHAPE_CACHE = SnapshotCache(ttl=600, fetcher=fetch_vshape)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -266,6 +269,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(EMOTION_CYCLE_CACHE, date)
         elif path == "/api/emotion_cycle_refresh":
             self._serve(EMOTION_CYCLE_CACHE, date, force=True)
+        elif path == "/api/vshape":
+            self._serve(VSHAPE_CACHE, date)
+        elif path == "/api/vshape_refresh":
+            self._serve(VSHAPE_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

@@ -57,6 +57,7 @@
     <button class="subtab" data-page="leaders" type="button">龙头股</button>
     <button class="subtab" data-page="pullback_ma" type="button">回踩支撑</button>
     <button class="subtab" data-page="support_valid" type="button">有效支撑</button>
+    <button class="subtab" data-page="vshape" type="button">V字洗盘</button>
   </nav>
   <nav class="subnav hidden" id="subnav-trading" data-section="trading" aria-label="交易策略二级导航">
     <button class="subtab active" data-page="trading" type="button">交易策略</button>
@@ -678,6 +679,26 @@
       <section class="panel" id="ec-sec-history">
         <h2>近期情绪走势</h2>
         <div id="ecHistory"></div>
+      </section>
+    </section>
+
+    <section id="page-vshape" class="page hidden">
+      <div class="rv-actions">
+        <span id="vsState" class="rv-state-text">加载中...</span>
+        <span class="rv-spacer"></span>
+      </div>
+
+      <div class="rv-hero" id="vsHero"></div>
+
+      <section class="panel" id="vs-sec-pool">
+        <h2>上升趋势 V 字洗盘 · 实时信号个股</h2>
+        <p id="vsPoolState" class="rv-text"></p>
+        <div id="vsPool"></div>
+      </section>
+
+      <section class="panel" id="vs-sec-rule">
+        <h2>选股条件说明</h2>
+        <div id="vsRule"></div>
       </section>
     </section>
 
