@@ -11,7 +11,7 @@ from .utils import to_num
 
 
 def fetch_watchlist_ticks(stocks):
-    """批量抓取个股分时数据并计算买点信号字段。"""
+    """批量抓取个股分时数据并计算买点信号字段（push2his/push2delay 主备并发）。"""
     def one(s):
         try:
             secid = ("1." if s["code"].startswith("6") else "0.") + s["code"]
@@ -22,10 +22,17 @@ def fetch_watchlist_ticks(stocks):
                 "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
                 "iscr": 0, "iscca": 1, "ndays": 1,
             }
-            url = "https://push2his.eastmoney.com/api/qt/stock/trends2/get?" + urllib.parse.urlencode(params)
-            data = net.http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})["data"]
-            trends = data.get("trends") or []
-            rows = [t.split(",") for t in trends]
+
+            def _one(host):
+                try:
+                    url = f"https://{host}/api/qt/stock/trends2/get?" + urllib.parse.urlencode(params)
+                    data = net.http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"}, tries=1, timeout=6)
+                    return (data.get("data") or {}).get("trends") or None
+                except Exception:
+                    return None
+
+            trends = net.race_fns([lambda: _one("push2his.eastmoney.com"), lambda: _one("push2delay.eastmoney.com")], prefer=0)
+            rows = [t.split(",") for t in (trends or [])]
             if not rows:
                 return s
             first = rows[0]

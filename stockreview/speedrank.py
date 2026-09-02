@@ -22,7 +22,7 @@ SPEED_WORKERS = 16
 
 
 def _intraday_closes(code):
-    """单只个股分时收盘价序列（每分钟）。"""
+    """单只个股分时收盘价序列（每分钟）。push2his/push2delay 主备并发，短超时快速失败。"""
     try:
         secid = ("1." if code.startswith("6") else "0.") + code
         params = {
@@ -32,10 +32,18 @@ def _intraday_closes(code):
             "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
             "iscr": 0, "iscca": 1, "ndays": 1,
         }
-        url = "https://push2his.eastmoney.com/api/qt/stock/trends2/get?" + urllib.parse.urlencode(params)
-        data = net.http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})["data"]
-        rows = data.get("trends") or []
-        return [float(r.split(",")[2]) for r in rows if len(r.split(",")) > 2]
+
+        def _one(host):
+            try:
+                url = f"https://{host}/api/qt/stock/trends2/get?" + urllib.parse.urlencode(params)
+                data = net.http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"}, tries=1, timeout=6)
+                rows = (data.get("data") or {}).get("trends") or []
+                closes = [float(r.split(",")[2]) for r in rows if len(r.split(",")) > 2]
+                return closes or None
+            except Exception:
+                return None
+
+        return net.race_fns([lambda: _one("push2his.eastmoney.com"), lambda: _one("push2delay.eastmoney.com")], prefer=0) or []
     except Exception:
         return []
 

@@ -10,7 +10,7 @@ import urllib.parse
 from datetime import datetime, timedelta
 
 from .config import ALL_A_FS, EMEX_UT, INDEX_UT, NEWS_KEYWORDS
-from .net import fetch_paged, http_get, http_get_json, race_fns
+from .net import fetch_paged, http_get, http_get_json, race_fns, ttl_cache
 from .utils import to_num
 
 # 指数分时/日K回退查询使用的基础字段串
@@ -31,6 +31,7 @@ INDICES = [
 ]
 
 
+@ttl_cache(15)
 def fetch_indices():
     """指数快照：优先分时接口取最新价与分时均价，失败回退 ulist 行情。"""
     indices = INDICES
@@ -82,6 +83,7 @@ def fetch_indices():
     return out
 
 
+@ttl_cache(15)
 def fetch_market_amount():
     """两市（上证+深证）成交额合计，单位亿。"""
     try:
@@ -98,6 +100,7 @@ def fetch_market_amount():
         return None
 
 
+@ttl_cache(15)
 def fetch_breadth(date=None):
     """涨跌家数分布（date 可选，默认当日，YYYYMMDD）。"""
     date = date or datetime.now().strftime("%Y%m%d")
@@ -150,14 +153,17 @@ def fetch_ex_pool(path, date=None):
     return {"tc": tc, "pool": pool}
 
 
+@ttl_cache(15)
 def fetch_zt_pool():
     return fetch_ex_pool("getTopicZTPool")
 
 
+@ttl_cache(15)
 def fetch_zb_pool():
     return fetch_ex_pool("getTopicZBPool")
 
 
+@ttl_cache(15)
 def fetch_dt_pool():
     return fetch_ex_pool("getTopicDTPool")
 
@@ -176,6 +182,7 @@ def find_previous_zt_pool():
     return None, {"tc": 0, "pool": []}
 
 
+@ttl_cache(15)
 def fetch_yesterday_zt_perf():
     """昨日涨停股今日溢价统计。"""
     prev_date, prev_zt = find_previous_zt_pool()
@@ -238,6 +245,7 @@ def board_rows(rows):
     return out
 
 
+@ttl_cache(15)
 def fetch_industry_boards():
     rows = fetch_paged(
         "m:90+t:2+f:!50",
@@ -246,6 +254,7 @@ def fetch_industry_boards():
     return board_rows(rows)
 
 
+@ttl_cache(15)
 def fetch_concept_boards():
     rows = fetch_paged(
         "m:90+t:3+f:!50",
@@ -254,6 +263,7 @@ def fetch_concept_boards():
     return board_rows(rows)
 
 
+@ttl_cache(15)
 def fetch_stock_flow_top(po=1, pz=40):
     """个股主力净流入榜（po=1 净流入榜，po=0 净流出榜）。"""
     fields = "f2,f3,f6,f8,f10,f12,f14,f17,f18,f62,f184"

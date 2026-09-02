@@ -1,12 +1,46 @@
 # -*- coding: utf-8 -*-
 """东方财富公开行情接口的 HTTP 请求封装（含重试与分页）。"""
 import json
+import threading
 import time
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import EM_UT, UA
+
+# ---------- 基础数据短 TTL 共享缓存（盘中 15s，实时盘口分区内页面共享，避免重复全市场扫描） ----------
+_TTL_CACHE = {}
+_TTL_LOCK = threading.Lock()
+
+
+def ttl_cache(seconds):
+    """函数级 TTL 缓存装饰器（线程安全，按 参数 缓存）。"""
+    def deco(fn):
+        sig = fn.__module__ + "." + fn.__name__
+
+        def wrapper(*args, **kwargs):
+            key = (sig, args, tuple(sorted(kwargs.items())))
+            now = time.time()
+            with _TTL_LOCK:
+                hit = _TTL_CACHE.get(key)
+                if hit and now - hit[0] < seconds:
+                    return hit[1]
+                if len(_TTL_CACHE) > 5000:
+                    _TTL_CACHE.clear()
+            val = fn(*args, **kwargs)
+            with _TTL_LOCK:
+                _TTL_CACHE[key] = (now, val)
+            # 浅拷贝，避免调用方修改污染共享缓存
+            if isinstance(val, list):
+                return list(val)
+            if isinstance(val, dict):
+                return dict(val)
+            return val
+
+        return wrapper
+
+    return deco
 
 
 def http_get(url, headers=None, decode="utf-8", timeout=18, tries=3):
@@ -30,7 +64,7 @@ def http_get_json(url, headers=None, tries=3, timeout=None):
     return json.loads(http_get(url, headers=headers, tries=tries, timeout=timeout or 18))
 
 
-def race_fns(fns, prefer=None, wait=1.5):
+def race_fns(fns, prefer=None, wait=0.8):
     """主备数据源并发请求：同时执行多个抓取函数，谁先成功返回用谁。
 
     - fns: 无参函数列表，各自内部捕获异常，失败返回 None。
@@ -87,6 +121,7 @@ def clist_url(fs, fields, fid="f3", po=1, pn=1, pz=100):
     return "https://push2delay.eastmoney.com/api/qt/clist/get?" + urllib.parse.urlencode(params)
 
 
+@ttl_cache(15)
 def fetch_paged(fs, fields, fid="f3", po=1, limit=600, workers=12):
     """按页拉取 clist 数据直到取满 limit 或翻完。
 
