@@ -390,6 +390,7 @@ def _em_kline_rows(klines, end_date=None):
     return out
 
 
+@ttl_cache(15)
 def fetch_kline_hist(code, limit=45, end_date=None):
     """日K线历史：东财/腾讯/新浪三源并发，谁先成功用谁（东财优先，失败快速切换备源）。
 
@@ -456,20 +457,21 @@ def _parse_kline_list(rows):
                     "date": row[0],
                     "open": to_num(row[1]), "close": to_num(row[2]),
                     "high": to_num(row[3]), "low": to_num(row[4]),
-                    "volume": to_num(row[5]),
+                    "volume": to_num(row[5]), "amount": 0.0,
                 })
             else:
                 out.append({
                     "date": row.get("day"),
                     "open": to_num(row.get("open")), "close": to_num(row.get("close")),
                     "high": to_num(row.get("high")), "low": to_num(row.get("low")),
-                    "volume": to_num(row.get("volume")),
+                    "volume": to_num(row.get("volume")), "amount": to_num(row.get("amount") or 0),
                 })
         except Exception:
             continue
     return out
 
 
+@ttl_cache(15)
 def fetch_long_kline(code, limit=250, end_date=None):
     """长周期日K线（用于突破新高判定）。
 
@@ -530,54 +532,55 @@ def fetch_long_kline(code, limit=250, end_date=None):
     return race_fns([_em, _tencent, _sina], prefer=0) or []
 
 
+@ttl_cache(15)
 def fetch_fflow_daykline(secid, limit=0):
-    """主力资金流历史（日线）。push2his 优先，push2delay 兜底（仅当日）。"""
+    """主力资金流历史（日线）。host 并发 + 短超时 + 15s 缓存。"""
     params = {
         "lmt": limit, "klt": 101, "secid": secid,
         "fields1": "f1,f2,f3,f7",
         "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
     }
-    for host in _history_hosts():
+
+    def _one(host):
         try:
             url = f"https://{host}/api/qt/stock/fflow/daykline/get?" + urllib.parse.urlencode(params)
-            data = http_get_json(url, headers={"Referer": "https://data.eastmoney.com/zjlx/detail.html"})
+            data = http_get_json(url, headers={"Referer": "https://data.eastmoney.com/zjlx/detail.html"}, tries=1, timeout=8)
             rows = (data.get("data") or {}).get("klines") or []
             if rows:
                 _note_history_ok()
                 return rows
+            return None
         except Exception:
             _note_history_fail()
-            continue
-    return []
+            return None
+
+    return race_fns([lambda h=h: _one(h) for h in _history_hosts()], prefer=0) or []
 
 
+@ttl_cache(15)
 def fetch_board_kline(code, limit=45, end_date=None):
-    """板块日K线（东财 kline 接口，secid=90.BKxxxx）。end_date 支持历史回放。"""
+    """板块日K线（东财 kline 接口，secid=90.BKxxxx）。host 并发 + 短超时 + 15s 缓存。"""
     params = {
         "secid": "90." + code,
         "fields1": "f1,f2,f3,f4,f5,f6",
         "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
         "klt": 101, "fqt": 1, "end": end_date.replace("-", "") if end_date else "20500101", "lmt": limit,
     }
-    for host in _history_hosts():
+
+    def _one(host):
         try:
             url = f"https://{host}/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
-            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"})
-            out = []
-            for line in (data.get("data") or {}).get("klines") or []:
-                p = line.split(",")
-                if len(p) < 11:
-                    continue
-                out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
-            if end_date:
-                out = [r for r in out if r["date"] <= end_date]
+            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"}, tries=1, timeout=8)
+            out = _em_kline_rows((data.get("data") or {}).get("klines") or [], end_date)
             if out:
                 _note_history_ok()
                 return out
+            return None
         except Exception:
             _note_history_fail()
-            continue
-    return []
+            return None
+
+    return race_fns([lambda h=h: _one(h) for h in _history_hosts()], prefer=0) or []
 
 
 def fetch_index_kline(secid, limit=45, end_date=None):

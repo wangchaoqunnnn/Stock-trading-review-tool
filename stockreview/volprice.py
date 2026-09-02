@@ -87,7 +87,7 @@ def fetch_volume_price_scan(date=None):
             closes = [h["close"] for h in hist]
             vols = [h["volume"] for h in hist]
             highs = [h["high"] for h in hist]
-            amounts = [h["amount"] for h in hist]
+            amounts = [h.get("amount", 0) for h in hist]
             today = hist[-1]
             prev5 = vols[-6:-1]
             prev5_avg = sum(prev5) / len(prev5) if prev5 else 0
@@ -97,11 +97,11 @@ def fetch_volume_price_scan(date=None):
             c["ma20"] = round(sum(closes[-20:]) / 20, 2)
             c["high10"] = max(highs[-11:-1]) if len(highs) >= 11 else max(highs[:-1]) if len(highs) > 1 else today["high"]
             c["high20"] = max(highs[-21:-1]) if len(highs) >= 21 else c["high10"]
-            c["amount20_max"] = max(amounts[-21:-1]) if len(amounts) >= 21 else max(amounts[:-1]) if len(amounts) > 1 else today["amount"]
+            c["amount20_max"] = max(amounts[-21:-1]) if len(amounts) >= 21 else max(amounts[:-1]) if len(amounts) > 1 else today.get("amount", 0)
             c["above_ma20"] = today["close"] > c["ma20"]
             c["break_high10"] = today["close"] > c["high10"]
             c["break_high20"] = today["close"] > c["high20"]
-            c["amount_new20"] = today["amount"] > c["amount20_max"]
+            c["amount_new20"] = today.get("amount", 0) > c["amount20_max"]
             c["vol_shrink_then_expand"] = bool(prev10_avg and prev5_avg and prev5_avg <= prev10_avg * 0.95 and today["volume"] >= prev5_avg * 1.5)
         else:
             c["hist_vol_ratio"] = None
