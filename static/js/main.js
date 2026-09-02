@@ -25,6 +25,7 @@ import { loadGlobalmac } from "./globalmac.js";
 import { loadTrading } from "./trading.js";
 import { loadTactics } from "./tactics.js";
 import { loadVshape } from "./vshape.js";
+import { loadNshape } from "./nshape.js";
 
 // 页面 -> 元素 id
 const PAGE_IDS = {
@@ -51,6 +52,7 @@ const PAGE_IDS = {
   trading: "page-trading",
   tactics: "page-tactics",
   vshape: "page-vshape",
+  nshape: "page-nshape",
 };
 
 // 页面 -> 数据加载函数
@@ -78,6 +80,7 @@ const LOADERS = {
   trading: loadTrading,
   tactics: loadTactics,
   vshape: loadVshape,
+  nshape: loadNshape,
 };
 
 // 一级分区 -> 二级页面列表（按交易时段 + 业务用途组织）
@@ -85,7 +88,7 @@ const SECTIONS = {
   preopen: { label: "开盘前瞻", default: "preopen", pages: ["preopen", "globalmac"] },
   realtime: { label: "实时盘口", default: "realtime", pages: ["realtime", "sectormv", "emotion_cycle", "ztpool", "speedrank", "hot"] },
   daily: { label: "每日复盘", default: "daily", pages: ["daily", "review", "heatmap"] },
-  strategy: { label: "策略选股", default: "volprice", pages: ["volprice", "pullback", "flow3", "trend3", "limit20", "breakout", "leaders", "pullback_ma", "support_valid", "vshape"] },
+  strategy: { label: "策略选股", default: "volprice", pages: ["volprice", "pullback", "flow3", "trend3", "limit20", "breakout", "leaders", "pullback_ma", "support_valid", "vshape", "nshape"] },
   trading: { label: "交易策略", default: "trading", pages: ["trading", "tactics"] },
 };
 

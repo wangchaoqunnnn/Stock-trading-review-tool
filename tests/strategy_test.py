@@ -1201,11 +1201,41 @@ def main():
     check(vs["stocks"][0]["depth"] > 0 and vs["stocks"][0]["ma20"] > 0, "信号字段完整")
     check("不构成任何投资建议" in vs["risk"], "风险提示")
 
+    print("== nshape 离线扫描 ==")
+    import stockreview.nshape as ns_mod
+
+    # 复用 tactics 段已定义的 n_hist/b_hist/flat_hist（同一 main 作用域）
+    check(ns_mod._check_n_shape(n_hist()) is not None, "N型三段式命中（拉升26%→回调5天缩量→放量上穿MA5）")
+    check(ns_mod._check_n_shape(flat_hist()) is None, "缓涨无N型不命中")
+
+    fake_boards_ns = [
+        {"name": "半导体", "pct": 2.0, "flow_yi": 8.0},
+        {"name": "银行", "pct": -0.5, "flow_yi": -2.0},
+    ]
+    r1 = ns_mod._board_resonance("半导体", fake_boards_ns, [])
+    r2 = ns_mod._board_resonance("银行", fake_boards_ns, [])
+    r3 = ns_mod._board_resonance("未知行业", fake_boards_ns, [])
+    check(r1["level"] == "strong" and r2["level"] == "weak" and r3 is None, "板块共振分级（强/无/未知）")
+
+    ns_mod.net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=6000: [
+        stock_row("600001", "甲科技", 4.0, 8.0e8, 1.4, 1.0e8),
+        stock_row("600002", "乙软件", 1.0, 8.0e8, 1.0, 1.0e8),
+    ]
+    ns_mod.em.fetch_kline_hist = lambda code, limit=45, end_date=None: (
+        [dict(x) for x in n_hist()] if code == "600001" else [dict(x) for x in flat_hist()])
+    ns_mod.em.fetch_industry_boards = lambda: [{"name": "半导体", "pct": 2.0, "flow_yi": 8.0}]
+    ns_mod.em.fetch_concept_boards = lambda: []
+    ns_mod.datetime = FakeDT
+    ns = ns_mod.fetch_nshape()
+    check(ns["count"] == 1 and ns["stocks"][0]["code"] == "600001", f"N型信号1只 实际{ns['count']}")
+    check(ns["stocks"][0]["resonance"]["level"] == "strong", "板块强共振")
+    check("不构成任何投资建议" in ns["risk"], "风险提示")
+
     print("== 生成 schema fixture ==")
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     from compare_schema import schema_map
     fixture_dir = os.path.join(ROOT, "tests", "fixtures")
-    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc), ("sectormv", sm), ("emotion_cycle", ec), ("vshape", vs)):
+    for name, data in (("flow3", flow3), ("trend3", trend3), ("limit20", d20), ("ztpool", zp), ("hot", hot2), ("breakout", bo), ("leaders", ld), ("heatmap", hm), ("emotion_history", eh), ("speedrank", sr), ("pullback_ma", pma), ("support_valid", sv), ("review", rv), ("preopen", po), ("globalmac", gm), ("trading", td), ("tactics", tc), ("sectormv", sm), ("emotion_cycle", ec), ("vshape", vs), ("nshape", ns)):
         sm = schema_map(data)
         with open(os.path.join(fixture_dir, f"baseline_{name}.json"), "w", encoding="utf-8") as f:
             json.dump(sm, f, ensure_ascii=False, indent=1)

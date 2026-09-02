@@ -26,6 +26,7 @@ from stockreview.heatmap import fetch_heatmap_scan
 from stockreview.hot import fetch_hot_scan
 from stockreview.leaders import fetch_leaders_scan
 from stockreview.limit20 import fetch_limit20_scan
+from stockreview.nshape import fetch_nshape
 from stockreview.pullback import fetch_pullback_scan
 from stockreview.pullback_ma import fetch_pullback_ma_scan
 from stockreview.preopen import fetch_preopen
@@ -94,6 +95,8 @@ SECTORMV_CACHE = SnapshotCache(ttl=30, fetcher=fetch_sector_momentum)
 EMOTION_CYCLE_CACHE = SnapshotCache(ttl=30, fetcher=fetch_emotion_cycle)
 # V字洗盘：扫描类，10 分钟缓存
 VSHAPE_CACHE = SnapshotCache(ttl=600, fetcher=fetch_vshape)
+# N型反转：扫描类，10 分钟缓存
+NSHAPE_CACHE = SnapshotCache(ttl=600, fetcher=fetch_nshape)
 
 # 静态资源 Content-Type 映射
 CONTENT_TYPES = {
@@ -273,6 +276,10 @@ class Handler(BaseHTTPRequestHandler):
             self._serve(VSHAPE_CACHE, date)
         elif path == "/api/vshape_refresh":
             self._serve(VSHAPE_CACHE, date, force=True)
+        elif path == "/api/nshape":
+            self._serve(NSHAPE_CACHE, date)
+        elif path == "/api/nshape_refresh":
+            self._serve(NSHAPE_CACHE, date, force=True)
         elif path == "/" or path == "/index.html":
             self._send_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
         else:

@@ -58,6 +58,7 @@
     <button class="subtab" data-page="pullback_ma" type="button">回踩支撑</button>
     <button class="subtab" data-page="support_valid" type="button">有效支撑</button>
     <button class="subtab" data-page="vshape" type="button">V字洗盘</button>
+    <button class="subtab" data-page="nshape" type="button">N型反转</button>
   </nav>
   <nav class="subnav hidden" id="subnav-trading" data-section="trading" aria-label="交易策略二级导航">
     <button class="subtab active" data-page="trading" type="button">交易策略</button>
@@ -699,6 +700,31 @@
       <section class="panel" id="vs-sec-rule">
         <h2>选股条件说明</h2>
         <div id="vsRule"></div>
+      </section>
+    </section>
+
+    <section id="page-nshape" class="page hidden">
+      <div class="rv-actions">
+        <span id="nsState" class="rv-state-text">加载中...</span>
+        <span class="rv-spacer"></span>
+      </div>
+
+      <div class="rv-hero" id="nsHero"></div>
+
+      <section class="panel" id="ns-sec-shape">
+        <h2>N 型反转 · 技术图形特点</h2>
+        <div id="nsShape"></div>
+      </section>
+
+      <section class="panel" id="ns-sec-pool">
+        <h2>实时信号个股（含板块共振）</h2>
+        <p id="nsPoolState" class="rv-text"></p>
+        <div id="nsPool"></div>
+      </section>
+
+      <section class="panel" id="ns-sec-rule">
+        <h2>选股条件与风险提示</h2>
+        <div id="nsRule"></div>
       </section>
     </section>
 
