@@ -4,7 +4,7 @@ import json
 import time
 import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import EM_UT, UA
 
@@ -25,9 +25,57 @@ def http_get(url, headers=None, decode="utf-8", timeout=18, tries=3):
             time.sleep(0.8)
 
 
-def http_get_json(url, headers=None, tries=3):
+def http_get_json(url, headers=None, tries=3, timeout=None):
     """GET 请求并解析 JSON。"""
-    return json.loads(http_get(url, headers=headers, tries=tries))
+    return json.loads(http_get(url, headers=headers, tries=tries, timeout=timeout or 18))
+
+
+def race_fns(fns, prefer=None, wait=1.5):
+    """主备数据源并发请求：同时执行多个抓取函数，谁先成功返回用谁。
+
+    - fns: 无参函数列表，各自内部捕获异常，失败返回 None。
+    - prefer: 优先源下标（如东财）；该源成功时优先使用其结果（最多等待 wait 秒），
+      否则使用第一个成功的备源——体现"东财优先"的同时不阻塞备源结果。
+    - 返回第一个成功结果，全部失败返回 None。慢源在后台结束，不阻塞调用方。
+    """
+    ex = ThreadPoolExecutor(max_workers=len(fns))
+    futs = {ex.submit(fn): i for i, fn in enumerate(fns)}
+    try:
+        first_ok = None
+        first_ok_idx = None
+        deadline = time.time() + wait
+        for f in as_completed(futs):
+            i = futs[f]
+            try:
+                r = f.result()
+            except Exception:
+                continue
+            if r is None:
+                continue
+            if prefer is not None and i == prefer:
+                return r  # 主源成功，直接返回
+            if first_ok is None:
+                first_ok, first_ok_idx = r, i
+                if prefer is None:
+                    return r
+                # 备源先成功：给主源一个等待窗，超时用备源
+                for f2 in as_completed(futs):
+                    j = futs[f2]
+                    if j == prefer:
+                        try:
+                            pr = f2.result()
+                            if pr is not None:
+                                return pr
+                        except Exception:
+                            pass
+                        return first_ok
+                    if time.time() > deadline:
+                        return first_ok
+        if first_ok is not None:
+            return first_ok
+        return None
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
 
 
 def clist_url(fs, fields, fid="f3", po=1, pn=1, pz=100):

@@ -10,7 +10,7 @@ import urllib.parse
 from datetime import datetime, timedelta
 
 from .config import ALL_A_FS, EMEX_UT, INDEX_UT, NEWS_KEYWORDS
-from .net import fetch_paged, http_get, http_get_json
+from .net import fetch_paged, http_get, http_get_json, race_fns
 from .utils import to_num
 
 # 指数分时/日K回退查询使用的基础字段串
@@ -335,8 +335,8 @@ def fetch_spot_map(codes, fields="f2,f3,f6,f8,f10,f12,f14,f62"):
 def fetch_amount_minutes(secid, ndays=2):
     """指数分时每分钟成交额（trends2 行[6]），按日期分组。
 
-    返回 {date: [(HH:MM, 每分钟成交额元), ...]}。push2his 优先（支持多日），
-    push2delay 兜底（通常仅当日）。
+    返回 {date: [(HH:MM, 每分钟成交额元), ...]}。push2his 与 push2delay 并发，
+    谁先成功用谁（push2his 优先，支持多日）。
     """
     params = {
         "secid": secid,
@@ -345,10 +345,11 @@ def fetch_amount_minutes(secid, ndays=2):
         "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
         "iscr": 0, "iscca": 1, "ndays": ndays,
     }
-    for host in ("push2his.eastmoney.com", "push2delay.eastmoney.com"):
+
+    def _one(host):
         try:
             url = f"https://{host}/api/qt/stock/trends2/get?" + urllib.parse.urlencode(params)
-            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})
+            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"}, tries=1, timeout=8)
             trends = (data.get("data") or {}).get("trends") or []
             out = {}
             for t in trends:
@@ -357,81 +358,82 @@ def fetch_amount_minutes(secid, ndays=2):
                     continue
                 day, tm = p[0][:10], p[0][11:16]
                 out.setdefault(day, []).append((tm, to_num(p[6])))
-            if out:
-                return out
+            return out or None
         except Exception:
+            return None
+
+    return race_fns([lambda: _one("push2his.eastmoney.com"), lambda: _one("push2delay.eastmoney.com")], prefer=0) or {}
+
+
+def _em_kline_rows(klines, end_date=None):
+    """东财 kline csv 行解析（date,open,close,high,low,vol,amount,...）。"""
+    out = []
+    for line in klines or []:
+        p = line.split(",")
+        if len(p) < 11:
             continue
-    return {}
+        out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]),
+                    "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]),
+                    "amount": to_num(p[6]), "pct": to_num(p[8])})
+    if end_date:
+        out = [r for r in out if r["date"] <= end_date]
+    return out
 
 
 def fetch_kline_hist(code, limit=45, end_date=None):
-    """日K线历史：腾讯接口优先，新浪回退，东财再回退。
+    """日K线历史：东财/腾讯/新浪三源并发，谁先成功用谁（东财优先，失败快速切换备源）。
 
     end_date: "YYYY-MM-DD" 时返回截至该日期的K线（历史回放用）。
     """
     prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
     symbol = prefix + code
-    rows = []
-    try:
-        param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
-        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
-        # 腾讯源快速失败时重试意义不大，减为 2 次避免拖慢批量扫描
-        data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=2)
-        node = (data.get("data") or {}).get(symbol) or {}
-        rows = node.get("qfqday") or node.get("day") or []
-    except Exception:
-        rows = []
-    if not rows:
+
+    def _tencent():
         try:
-            url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": 45})
-            text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"}, tries=2)
+            param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
+            url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
+            data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=1, timeout=8)
+            node = (data.get("data") or {}).get(symbol) or {}
+            rows = node.get("qfqday") or node.get("day") or []
+            out = _parse_kline_list(rows[-limit:])
+            if end_date:
+                out = [r for r in out if r["date"] <= end_date]
+            return out if len(out) >= 25 else None
+        except Exception:
+            return None
+
+    def _sina():
+        try:
+            url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": min(max(limit * 2, 45), 1000)})
+            text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"}, tries=1, timeout=8)
             m = re.search(r"\[(.*)\]", text, re.S)
-            if m:
-                rows = json.loads("[" + m.group(1) + "]")
+            if not m:
+                return None
+            out = _parse_kline_list(json.loads("[" + m.group(1) + "]")[-limit:])
+            if end_date:
+                out = [r for r in out if r["date"] <= end_date]
+            return out if len(out) >= 25 else None
         except Exception:
-            rows = []
-    out = []
-    for row in rows[-limit:]:
+            return None
+
+    def _em():
         try:
-            if isinstance(row, list):
-                date = row[0]
-                open_ = to_num(row[1]); close = to_num(row[2])
-                high = to_num(row[3]); low = to_num(row[4]); volume = to_num(row[5])
-            else:
-                date = row.get("day")
-                open_ = to_num(row.get("open")); close = to_num(row.get("close"))
-                high = to_num(row.get("high")); low = to_num(row.get("low")); volume = to_num(row.get("volume"))
-            if end_date and date and str(date) > end_date:
-                continue
-            pct = 0.0
-            if out:
-                prev_close = out[-1]["close"]
-                pct = round((close / prev_close - 1) * 100, 2) if prev_close else 0.0
-            out.append({"date": date, "open": open_, "close": close, "high": high, "low": low, "volume": volume, "amount": 0.0, "pct": pct})
+            secid = ("1." if code.startswith("6") else "0.") + code
+            params = {
+                "secid": secid,
+                "fields1": "f1,f2,f3,f4,f5,f6",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+                "klt": 101, "fqt": 1, "beg": "20260701",
+                "end": end_date.replace("-", "") if end_date else "20500101",
+            }
+            url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
+            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"}, tries=1, timeout=8)
+            out = _em_kline_rows((data.get("data") or {}).get("klines") or [], end_date)
+            return out if len(out) >= 25 else None
         except Exception:
-            continue
-    if len(out) >= 25:
-        return out
-    try:
-        secid = ("1." if code.startswith("6") else "0.") + code
-        params = {
-            "secid": secid,
-            "fields1": "f1,f2,f3,f4,f5,f6",
-            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-            "klt": 101, "fqt": 1, "beg": "20260701",
-            "end": end_date.replace("-", "") if end_date else "20500101",
-        }
-        url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
-        data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"})["data"]
-        out = []
-        for line in (data.get("klines") or []):
-            p = line.split(",")
-            if len(p) < 11:
-                continue
-            out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
-        return out
-    except Exception:
-        return []
+            return None
+
+    return race_fns([_em, _tencent, _sina], prefer=0) or []
 
 
 def _parse_kline_list(rows):
@@ -461,64 +463,61 @@ def _parse_kline_list(rows):
 def fetch_long_kline(code, limit=250, end_date=None):
     """长周期日K线（用于突破新高判定）。
 
-    腾讯优先；东财 kline 动态回溯（约 limit 个交易日）次之；新浪 45 天兜底。
+    东财/腾讯/新浪三源并发，谁先成功用谁（东财优先，失败快速切换备源）。
     end_date: "YYYY-MM-DD" 时返回截至该日期的K线。
     """
     prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
     symbol = prefix + code
-    try:
-        param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
-        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
-        data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=2)
-        node = (data.get("data") or {}).get(symbol) or {}
-        rows = node.get("qfqday") or node.get("day") or []
-        out = _parse_kline_list(rows[-limit:])
-        if end_date:
-            out = [r for r in out if r["date"] <= end_date]
-        if len(out) >= 25:
-            return out
-    except Exception:
-        pass
-    try:
-        # 东财长历史：beg 按 limit 向前推（约 1.6 倍自然日）
-        ref = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
-        beg = (ref - timedelta(days=int(limit * 1.6) + 30)).strftime("%Y%m%d")
-        secid = ("1." if code.startswith("6") else "0.") + code
-        params = {
-            "secid": secid,
-            "fields1": "f1,f2,f3,f4,f5,f6",
-            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-            "klt": 101, "fqt": 1, "beg": beg,
-            "end": end_date.replace("-", "") if end_date else "20500101",
-        }
-        url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
-        data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"}, tries=2)
-        out = []
-        for line in (data.get("data") or {}).get("klines") or []:
-            p = line.split(",")
-            if len(p) < 11:
-                continue
-            out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
-        if len(out) >= 25:
-            return out
-    except Exception:
-        pass
-    try:
-        # 新浪长历史：datalen 随 limit（上限 1000，约 4 年）
-        datalen = min(max(limit * 2, 100), 1000)
-        url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": datalen})
-        text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"}, tries=2)
-        m = re.search(r"\[(.*)\]", text, re.S)
-        if m:
-            rows = json.loads("[" + m.group(1) + "]")
-            out = _parse_kline_list(rows)
+
+    def _tencent():
+        try:
+            param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
+            url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
+            data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=1, timeout=8)
+            node = (data.get("data") or {}).get(symbol) or {}
+            rows = node.get("qfqday") or node.get("day") or []
+            out = _parse_kline_list(rows[-limit:])
             if end_date:
                 out = [r for r in out if r["date"] <= end_date]
-            if len(out) >= 25:
-                return out
-    except Exception:
-        pass
-    return []
+            return out if len(out) >= 25 else None
+        except Exception:
+            return None
+
+    def _em():
+        try:
+            ref = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+            beg = (ref - timedelta(days=int(limit * 1.6) + 30)).strftime("%Y%m%d")
+            secid = ("1." if code.startswith("6") else "0.") + code
+            params = {
+                "secid": secid,
+                "fields1": "f1,f2,f3,f4,f5,f6",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+                "klt": 101, "fqt": 1, "beg": beg,
+                "end": end_date.replace("-", "") if end_date else "20500101",
+            }
+            url = "https://push2his.eastmoney.com/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
+            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"}, tries=1, timeout=8)
+            out = _em_kline_rows((data.get("data") or {}).get("klines") or [], end_date)
+            return out if len(out) >= 25 else None
+        except Exception:
+            return None
+
+    def _sina():
+        try:
+            datalen = min(max(limit * 2, 100), 1000)
+            url = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?" + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": datalen})
+            text = http_get(url, headers={"Referer": "https://finance.sina.com.cn/"}, tries=1, timeout=8)
+            m = re.search(r"\[(.*)\]", text, re.S)
+            if not m:
+                return None
+            out = _parse_kline_list(json.loads("[" + m.group(1) + "]"))
+            if end_date:
+                out = [r for r in out if r["date"] <= end_date]
+            return out if len(out) >= 25 else None
+        except Exception:
+            return None
+
+    return race_fns([_em, _tencent, _sina], prefer=0) or []
 
 
 def fetch_fflow_daykline(secid, limit=0):
@@ -572,58 +571,57 @@ def fetch_board_kline(code, limit=45, end_date=None):
 
 
 def fetch_index_kline(secid, limit=45, end_date=None):
-    """指数日K线。腾讯优先（sh/sz/bj 前缀），东财兜底。返回 [{date, open, close, high, low, volume, amount, pct}]。"""
-    # 腾讯指数K线
-    try:
-        prefix = "sh" if secid.startswith("1.") else "sz" if secid.startswith("0.") else "bj"
-        symbol = prefix + secid.split(".")[1]
-        param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
-        url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
-        data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=2)
-        node = (data.get("data") or {}).get(symbol) or {}
-        rows = node.get("qfqday") or node.get("day") or []
-        out = []
-        prev = None
-        for row in rows[-limit:]:
-            item = {"date": row[0], "open": to_num(row[1]), "close": to_num(row[2]),
-                    "high": to_num(row[3]), "low": to_num(row[4]), "volume": to_num(row[5]), "amount": 0.0}
-            item["pct"] = round((item["close"] / prev - 1) * 100, 2) if prev else 0.0
-            prev = item["close"]
-            out.append(item)
-        if end_date:
-            out = [r for r in out if r["date"] <= end_date]
-        if len(out) >= 2:
-            return out
-    except Exception:
-        pass
-    # 东财兜底
-    params = {
-        "secid": secid,
-        "fields1": "f1,f2,f3,f4,f5,f6",
-        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-        "klt": 101, "fqt": 1, "beg": "20240101",
-        "end": end_date.replace("-", "") if end_date else "20500101",
-        "lmt": limit,
-    }
-    for host in _history_hosts():
+    """指数日K线。东财/腾讯两源并发，谁先成功用谁（东财优先）。返回 [{date, open, close, high, low, volume, amount, pct}]。"""
+
+    def _tencent():
         try:
-            url = f"https://{host}/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
-            data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"})
+            prefix = "sh" if secid.startswith("1.") else "sz" if secid.startswith("0.") else "bj"
+            symbol = prefix + secid.split(".")[1]
+            param = f"{symbol},day,{end_date},,{limit},qfq" if end_date else f"{symbol},day,,,{limit},qfq"
+            url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?" + urllib.parse.urlencode({"param": param})
+            data = http_get_json(url, headers={"Referer": "https://gu.qq.com/"}, tries=1, timeout=8)
+            node = (data.get("data") or {}).get(symbol) or {}
+            rows = node.get("qfqday") or node.get("day") or []
             out = []
-            for line in (data.get("data") or {}).get("klines") or []:
-                p = line.split(",")
-                if len(p) < 11:
-                    continue
-                out.append({"date": p[0], "open": to_num(p[1]), "close": to_num(p[2]), "high": to_num(p[3]), "low": to_num(p[4]), "volume": to_num(p[5]), "amount": to_num(p[6]), "pct": to_num(p[8])})
+            prev = None
+            for row in rows[-limit:]:
+                item = {"date": row[0], "open": to_num(row[1]), "close": to_num(row[2]),
+                        "high": to_num(row[3]), "low": to_num(row[4]), "volume": to_num(row[5]), "amount": 0.0}
+                item["pct"] = round((item["close"] / prev - 1) * 100, 2) if prev else 0.0
+                prev = item["close"]
+                out.append(item)
             if end_date:
                 out = [r for r in out if r["date"] <= end_date]
-            if out:
-                _note_history_ok()
-                return out
+            return out if len(out) >= 2 else None
         except Exception:
-            _note_history_fail()
-            continue
-    return []
+            return None
+
+    def _em():
+        try:
+            params = {
+                "secid": secid,
+                "fields1": "f1,f2,f3,f4,f5,f6",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+                "klt": 101, "fqt": 1, "beg": "20240101",
+                "end": end_date.replace("-", "") if end_date else "20500101",
+                "lmt": limit,
+            }
+            for host in _history_hosts():
+                try:
+                    url = f"https://{host}/api/qt/stock/kline/get?" + urllib.parse.urlencode(params)
+                    data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/", "Connection": "close"}, tries=1, timeout=8)
+                    out = _em_kline_rows((data.get("data") or {}).get("klines") or [], end_date)
+                    if out:
+                        _note_history_ok()
+                        return out
+                except Exception:
+                    _note_history_fail()
+                    continue
+            return None
+        except Exception:
+            return None
+
+    return race_fns([_em, _tencent], prefer=0) or []
 
 
 # ---------- 历史接口熔断（push2his 连续失败时短暂跳过，避免扫描被重试拖垮） ----------
