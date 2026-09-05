@@ -237,7 +237,7 @@ async function exportHtml() {
 
   let css = "";
   try {
-    const resp = await fetch("/style.css");
+    const resp = await fetch("style.css");
     css = await resp.text();
   } catch (e) {
     css = "";

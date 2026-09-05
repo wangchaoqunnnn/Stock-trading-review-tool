@@ -4,9 +4,10 @@ import { selectedDate } from "./state.js";
 
 export const $ = (id) => document.getElementById(id);
 
-// 构造 API 地址：历史回放模式下附加 date 参数
+// 构造 API 地址：相对路径（兼容根部署与子路径部署，如 Nginx /tools/ 前缀）；
+// 历史回放模式下附加 date 参数
 export function apiUrl(path, force) {
-  const base = path + (force ? "_refresh" : "");
+  const base = path.replace(/^\//, "") + (force ? "_refresh" : "");
   return base + (selectedDate ? "?date=" + encodeURIComponent(selectedDate) : "");
 }
 
