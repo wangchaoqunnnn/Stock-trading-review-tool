@@ -4,6 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>A股每日复盘</title>
+  <script>
+    /* 子路径部署自适应：从当前 URL 推断应用根并设置 <base>，
+       使 style.css / js/main.js / fetch("api/...") 等相对引用统一解析到子路径
+       （如 /tools/），兼容根部署与 Nginx 前缀代理，无需尾斜杠约定。 */
+    (function () {
+      var p = window.location.pathname || "/";
+      if (!p.endsWith("/")) {
+        var last = p.slice(p.lastIndexOf("/") + 1);
+        if (last && last.indexOf(".") < 0) {
+          p += "/";           // 无扩展名段视为目录：/tools -> /tools/
+        } else {
+          p = p.slice(0, p.lastIndexOf("/") + 1); // 含文件名：/index.html -> /
+        }
+      }
+      var b = document.createElement("base");
+      b.href = p;
+      document.head.appendChild(b);
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
