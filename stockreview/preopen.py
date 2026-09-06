@@ -668,8 +668,11 @@ def fetch_preopen(date=None):
             "rating": {"level": rating, "reason": rating_reason},
         },
         "sectors": {
-            "top": [{k: s.get(k) for k in ("name", "pct", "up", "down", "count", "leader", "leader_pct", "amount_yi")} for s in sectors[:10]],
-            "bottom": [{k: s.get(k) for k in ("name", "pct", "up", "down", "count", "leader", "leader_pct", "amount_yi")} for s in sectors[-10:]],
+            # 涨幅榜只列实际上涨板块、跌幅榜只列实际下跌板块（普跌/普涨日不会出现方向混杂）
+            "top": [{k: s.get(k) for k in ("name", "pct", "up", "down", "count", "leader", "leader_pct", "amount_yi")}
+                    for s in sectors if s["pct"] > 0][:10],
+            "bottom": [{k: s.get(k) for k in ("name", "pct", "up", "down", "count", "leader", "leader_pct", "amount_yi")}
+                       for s in reversed(sectors) if s["pct"] < 0][:10],
             "feature": feature,
             "movers": _top_movers(rows),
         },
