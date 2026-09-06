@@ -975,6 +975,9 @@ section[id^="rv-sec-"], section[id^="po-sec-"], section[id^="gm-sec-"], section[
   font-size: 12px;
 }
 .rv-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+/* 表格单元格内的涨跌配色：特异性高于 .rv-table td 的文字色 */
+.rv-table td.up, .rv-table td.up b { color: var(--up); }
+.rv-table td.down, .rv-table td.down b { color: var(--down); }
 .rv-table tr:hover td { background: rgba(255, 255, 255, 0.03); }
 .rv-table .num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 
