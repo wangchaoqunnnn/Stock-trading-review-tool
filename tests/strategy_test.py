@@ -815,6 +815,9 @@ def main():
         # 无行业 / 无涨跌幅（应被跳过）
         mk("X1", "无名1", 5.0, "-"); mk("X2", "无名2", 5.0, None)
         rows.append({"f2": 100.0, "f3": None, "f6": 2.0e8, "f12": "X3", "f14": "停牌", "f100": "信息技术"})
+        # 杠杆ETF（应被 movers 过滤，即使涨幅极大）
+        mk("L1", "二倍做多特斯拉ETF-Direxion", 80.0, "ETF", 2.0e8)
+        mk("L2", "三倍做空纳指ETF-ProShares", -70.0, "ETF", 2.0e8)
         return rows
 
     po_mod._us_universe = fake_universe
@@ -853,10 +856,10 @@ def main():
     check(po["indices"][0]["price"] == 53100.0 and po["indices"][0]["pct"] == -0.68, "指数点位/涨跌幅")
     check("低开" in po["rhythm"] or "高开" in po["rhythm"] or "平开" in po["rhythm"], "指数节奏描述")
     b = po["market"]["breadth"]
-    check(b["up"] == 12 and b["down"] == 3 and b["flat"] == 1,
-          f"涨跌分布（仅NaN跳过，无行业也计入）实际 {b['up']}/{b['down']}/{b['flat']}")
-    check(b["big_up"] == 4 and b["wild"] == 1, "大涨/异动计数")
-    check(b["total_amt_yi"] == 16.0, f"个股成交合计 16 亿（NaN 不计）实际 {b['total_amt_yi']}")
+    check(b["up"] == 13 and b["down"] == 4 and b["flat"] == 1,
+          f"涨跌分布（杠杆ETF计入breadth）实际 {b['up']}/{b['down']}/{b['flat']}")
+    check(b["big_up"] == 5 and b["wild"] == 3, "大涨/异动计数（含杠杆ETF）")
+    check(b["total_amt_yi"] == 20.0, f"个股成交合计 20 亿（含杠杆ETF）实际 {b['total_amt_yi']}")
     check(po["market"]["rating"]["level"] in ("极寒", "偏冷", "温和", "火热"), "赚钱效应评级")
     sec_top = po["sectors"]["top"]
     check(sec_top[0]["name"] == "能源" and abs(sec_top[0]["pct"] - 1.12) < 0.02, "板块涨幅取剔除极端值均值（能源≈1.12）")
@@ -866,8 +869,10 @@ def main():
     check("能源板块领涨" in po["sectors"]["feature"], "板块特征")
     mv = po["sectors"].get("movers") or {}
     check(mv.get("up") and mv["up"][0]["name"] == "妖股" and mv["up"][0]["pct"] == 90.0,
-          "领涨热门股TOP（妖股+90%居首，成交额≥1亿过滤）")
-    check(mv.get("down") and mv["down"][0]["pct"] == -1.0, "领跌热门股（庚芯-1.0%）")
+          "领涨热门股TOP（妖股+90%居首，杠杆ETF被过滤）")
+    check(all("做多" not in s["name"] and "做空" not in s["name"] for s in mv.get("up", []) + mv.get("down", [])),
+          "倍做多/倍做空杠杆ETF已剔除")
+    check(mv.get("down") and mv["down"][0]["pct"] == -1.0, "领跌热门股（庚芯-1.0%，做空ETF不占榜）")
     cn_groups = {g["group"]: g["avg_pct"] for g in po["cn"]["groups"]}
     check(abs(cn_groups["互联网"] + 2.51) < 0.01 and abs(cn_groups["新能源车"] + 0.08) < 0.01, "中概分组均值")
     check("网易" in po["cn"]["verdict"] and "中概互联网ETF" in po["cn"]["verdict"], "中概解读")

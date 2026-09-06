@@ -223,10 +223,16 @@ def _us_sectors(rows):
 
 # 领涨/领跌热门个股的成交额下限（美元；过滤无流动性的微盘股/权证暴涨）
 MOVER_MIN_AMOUNT = 100000000  # 1 亿美元
+# 杠杆 ETF 过滤（做多/做空类，干扰个股涨跌榜）
+_LEVERAGE_RE = re.compile(r"(做多|做空|倍做|Leverage|Ultra|(^|[^a-z])2x|(^|[^a-z])3x|Bull|Bear)", re.I)
+
+
+def _is_leverage(name):
+    return bool(name) and bool(_LEVERAGE_RE.search(name))
 
 
 def _top_movers(rows, n=10):
-    """美股热门股（成交额 ≥1 亿美元）中涨跌幅前 n / 后 n。
+    """美股热门股（成交额 ≥1 亿美元、剔除杠杆ETF）中涨跌幅前 n / 后 n。
 
     返回 {"up": [...], "down": [...]}，每项含 code/name/pct/price/amount_yi/industry。
     """
@@ -234,10 +240,13 @@ def _top_movers(rows, n=10):
     for r in rows:
         amt = to_num(r.get("f6"))
         pct = to_num(r.get("f3"))
+        name = r.get("f14") or ""
         if pct != pct or amt != amt or amt < MOVER_MIN_AMOUNT:
             continue
+        if _is_leverage(name):
+            continue  # 剔除倍做多/倍做空杠杆ETF
         hot.append({
-            "code": r.get("f12"), "name": r.get("f14"),
+            "code": r.get("f12"), "name": name,
             "pct": round(pct, 2),
             "price": round(to_num(r.get("f2")), 2),
             "amount_yi": round(amt / 100000000, 2),
