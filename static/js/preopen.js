@@ -141,6 +141,31 @@ function renderSectors(d) {
       </div>
     </div>
     <p class="rv-text" style="margin-top:12px"><b>隔夜板块核心特征：</b>${esc(s.feature || "")}</p>`;
+  const mv = s.movers || {};
+  const moverTable = (rows, up) => rows && rows.length ? `
+    <table class="rv-table"><thead><tr>
+      <th>代码</th><th>名称/行业</th><th class="num">现价</th><th class="num">涨跌幅</th><th class="num">成交(亿美元)</th>
+    </tr></thead><tbody>` + rows.map((r) => `
+      <tr>
+        <td>${esc(r.code)}</td>
+        <td><b>${esc(r.name)}</b><br><span class="rv-idx-amt">${esc(r.industry || "—")}</span></td>
+        <td class="num">${fmt(r.price)}</td>
+        <td class="num ${pctClass(r.pct)}">${signed(r.pct)}</td>
+        <td class="num">${fmt(r.amount_yi)}</td>
+      </tr>`).join("") + `</tbody></table>`
+    : `<div class="subtitle">暂无（成交额 ≥1 亿美元的个股中）</div>`;
+  $("poMovers").innerHTML = `
+    <div class="rv-two">
+      <div>
+        <h3 class="rv-sub" style="color:#e53935">▲ 领涨热门股 TOP10</h3>
+        ${moverTable(mv.up, true)}
+      </div>
+      <div>
+        <h3 class="rv-sub" style="color:#2e7d32">▼ 领跌热门股 TOP10</h3>
+        ${moverTable(mv.down, false)}
+      </div>
+    </div>
+    <p class="rv-text rv-note" style="font-size:12px;margin-top:6px">口径：美股全市场个股按当日涨跌幅排序，仅统计成交额 ≥1 亿美元的热门股（过滤微盘股/权证暴涨）。</p>`;
 }
 
 /* ---------- 四、中概股 & 港股 ADR ---------- */

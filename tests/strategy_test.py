@@ -864,6 +864,10 @@ def main():
     check(abs(info["pct"] - 1.06) < 0.02, f"信息技术剔除妖股后均值≈1.06（含妖股为12.2）实际 {info['pct']}")
     check(info["leader"] == "辛软" and info["leader_pct"] == 6.0, "板块领涨龙头=剔除极端值后的组内最大者（妖股+90%被剔除）")
     check("能源板块领涨" in po["sectors"]["feature"], "板块特征")
+    mv = po["sectors"].get("movers") or {}
+    check(mv.get("up") and mv["up"][0]["name"] == "妖股" and mv["up"][0]["pct"] == 90.0,
+          "领涨热门股TOP（妖股+90%居首，成交额≥1亿过滤）")
+    check(mv.get("down") and mv["down"][0]["pct"] == -1.0, "领跌热门股（庚芯-1.0%）")
     cn_groups = {g["group"]: g["avg_pct"] for g in po["cn"]["groups"]}
     check(abs(cn_groups["互联网"] + 2.51) < 0.01 and abs(cn_groups["新能源车"] + 0.08) < 0.01, "中概分组均值")
     check("网易" in po["cn"]["verdict"] and "中概互联网ETF" in po["cn"]["verdict"], "中概解读")

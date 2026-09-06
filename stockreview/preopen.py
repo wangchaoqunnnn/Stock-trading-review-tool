@@ -221,6 +221,32 @@ def _us_sectors(rows):
     return out
 
 
+# 领涨/领跌热门个股的成交额下限（美元；过滤无流动性的微盘股/权证暴涨）
+MOVER_MIN_AMOUNT = 100000000  # 1 亿美元
+
+
+def _top_movers(rows, n=10):
+    """美股热门股（成交额 ≥1 亿美元）中涨跌幅前 n / 后 n。
+
+    返回 {"up": [...], "down": [...]}，每项含 code/name/pct/price/amount_yi/industry。
+    """
+    hot = []
+    for r in rows:
+        amt = to_num(r.get("f6"))
+        pct = to_num(r.get("f3"))
+        if pct != pct or amt != amt or amt < MOVER_MIN_AMOUNT:
+            continue
+        hot.append({
+            "code": r.get("f12"), "name": r.get("f14"),
+            "pct": round(pct, 2),
+            "price": round(to_num(r.get("f2")), 2),
+            "amount_yi": round(amt / 100000000, 2),
+            "industry": r.get("f100"),
+        })
+    hot.sort(key=lambda x: -x["pct"])
+    return {"up": hot[:n], "down": hot[-n:][::-1]}
+
+
 def _us_rating(spx_pct, b, sectors):
     """美股赚钱效应评级：极寒/偏冷/温和/火热。"""
     score = 0
@@ -636,6 +662,7 @@ def fetch_preopen(date=None):
             "top": [{k: s.get(k) for k in ("name", "pct", "up", "down", "count", "leader", "leader_pct", "amount_yi")} for s in sectors[:10]],
             "bottom": [{k: s.get(k) for k in ("name", "pct", "up", "down", "count", "leader", "leader_pct", "amount_yi")} for s in sectors[-10:]],
             "feature": feature,
+            "movers": _top_movers(rows),
         },
         "cn": {"stocks": cn_stocks, "groups": cn_groups, "etfs": cn_etfs, "verdict": cn_verdict},
         "fx": {"rows": fx_rows, "verdict": fx_verdict},
