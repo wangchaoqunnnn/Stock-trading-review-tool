@@ -292,11 +292,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error(404)
 
 
+def _start_prewarm():
+    """服务启动后后台预热关键缓存（交易策略/实时盘口依赖的全市场扫描），
+    使首次访问也命中缓存、快速响应，避免 Nginx 网关超时（502/504）。"""
+    import threading
+
+    def run():
+        try:
+            SUPPORT_VALID_CACHE.get()   # 有效支撑（交易策略依赖）
+            PULLBACK_CACHE.get()        # 涨停回踩（交易策略依赖）
+            REALTIME_CACHE.get()        # 实时盘口
+            ZTPOOL_CACHE.get()          # 今日涨停
+        except Exception:
+            pass
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PORT
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"A股每日复盘服务已启动: http://127.0.0.1:{port}")
     print("首次数据抓取需要几秒，之后每30秒自动刷新。")
+    print("后台预热中（有效支撑/涨停回踩/实时盘口），请稍候...")
+    _start_prewarm()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
