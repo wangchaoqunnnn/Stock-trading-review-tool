@@ -18,7 +18,7 @@ from . import em
 from .analysis import compute_emotion
 from .emotion_history import emotion_score, fetch_emotion_history
 from .snapshot import _prev_amount_at
-from .utils import to_num
+from .utils import big_loss_pct, limit_pct, to_num
 
 RISK_TEXT = "本文为情绪周期研究参考，不构成任何投资建议。市场有风险，投资需谨慎。"
 
@@ -112,13 +112,14 @@ def _compute_metrics(zt, zb, dt, spot, total_amount, amount_prev, is_preopen=Fal
     if not is_preopen and prev_total:
         promo = 0
         big_loss = 0
-        for r in spot.values():
+        for code, r in spot.items():
             pct = to_num(r.get("f3"))
             if pct != pct:
                 continue
-            if pct >= 9.5:
+            # 逐票按板块口径判定（北交所 30%、创业板·科创板 20%、主板 10%）
+            if pct >= limit_pct(code):
                 promo += 1
-            if pct <= -7:
+            if pct <= big_loss_pct(code):
                 big_loss += 1
         promo_rate = round(promo / prev_total * 100, 1)
 
@@ -233,9 +234,10 @@ def _leader_status(prev_leader, spot):
     pct = to_num(row.get("f3"))
     if pct != pct:
         return "unknown", prev_leader["name"]
-    if pct <= -9.5:
+    thr = limit_pct(prev_leader["code"])
+    if pct <= -thr:
         return "limit_down", prev_leader["name"]
-    if pct < 9.5:
+    if pct < thr:
         return "break", prev_leader["name"]
     return "up", prev_leader["name"]
 

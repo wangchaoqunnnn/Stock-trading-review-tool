@@ -15,7 +15,7 @@ from datetime import datetime
 
 from . import em, net
 from .config import ALL_A_FS, INDEX_UT
-from .utils import to_num
+from .utils import amount_floor, select_candidates, to_num
 
 RISK_TEXT = "本文为策略选股研究参考，不构成任何投资建议。市场有风险，投资需谨慎。"
 
@@ -151,7 +151,7 @@ def fetch_vshape(date=None):
     for r in stocks:
         pct = to_num(r.get("f3"))
         amount = to_num(r.get("f6"))
-        if pct != pct or amount < MIN_AMOUNT_YI * 100000000 or not (PCT_MIN <= pct <= PCT_MAX):
+        if pct != pct or amount < amount_floor(r.get("f12"), MIN_AMOUNT_YI) * 100000000 or not (PCT_MIN <= pct <= PCT_MAX):
             continue
         candidates.append({
             "code": str(r.get("f12")), "name": r.get("f14"),
@@ -160,8 +160,7 @@ def fetch_vshape(date=None):
             "vol_ratio": round(to_num(r.get("f10")), 2),
             "industry": r.get("f100"),
         })
-    candidates.sort(key=lambda x: -x["amount_yi"])
-    candidates = candidates[:MAX_CHECK]
+    candidates = select_candidates(candidates, MAX_CHECK, key=lambda x: x["amount_yi"])
 
     # 1) K线核对：站上MA20且MA20走高
     def enrich(c):
@@ -178,8 +177,7 @@ def fetch_vshape(date=None):
 
     with ThreadPoolExecutor(max_workers=24) as ex:
         trend_ok = [x for x in ex.map(enrich, candidates) if x is not None]
-    trend_ok.sort(key=lambda x: -x["amount_yi"])
-    trend_ok = trend_ok[:MAX_TICK]
+    trend_ok = select_candidates(trend_ok, MAX_TICK, key=lambda x: x["amount_yi"])
 
     # 2) 分时深 V 检测
     def check_v(c):

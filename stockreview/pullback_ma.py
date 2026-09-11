@@ -12,7 +12,7 @@ from . import em, net
 from .analysis import is_uptrend, ma_of, pullback_to_ma, vol_shrink_ratio
 from .config import ALL_A_FS
 from .market import fetch_market_context
-from .utils import to_num
+from .utils import amount_floor, select_candidates, to_num
 
 # 全A扫描行情字段
 SCAN_FIELDS = "f2,f3,f5,f6,f8,f10,f12,f14,f17,f18,f22,f62,f100"
@@ -101,10 +101,9 @@ def fetch_pullback_ma_scan(date=None):
     candidates = [
         r for r in stocks
         if PCT_MIN <= to_num(r.get("f3")) <= PCT_MAX
-        and to_num(r.get("f6")) >= MIN_AMOUNT_YI * 100000000
+        and to_num(r.get("f6")) >= amount_floor(r.get("f12"), MIN_AMOUNT_YI) * 100000000
     ]
-    candidates.sort(key=lambda r: -to_num(r.get("f6")))
-    candidates = candidates[:MAX_CHECK]
+    candidates = select_candidates(candidates, MAX_CHECK, key=lambda r: to_num(r.get("f6")))
 
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
         hits = list(ex.map(lambda r: _check_stock(r, date), candidates))
@@ -119,8 +118,8 @@ def fetch_pullback_ma_scan(date=None):
                 ma5_rows.append(item)
             else:
                 ma10_rows.append(item)
-    ma5_rows.sort(key=lambda x: -x["amount_yi"])
-    ma10_rows.sort(key=lambda x: -x["amount_yi"])
+    ma5_rows = select_candidates(ma5_rows, STOCK_LIMIT, key=lambda x: x["amount_yi"])
+    ma10_rows = select_candidates(ma10_rows, STOCK_LIMIT, key=lambda x: x["amount_yi"])
 
     return {
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -131,7 +130,7 @@ def fetch_pullback_ma_scan(date=None):
             "amount_yi": context["amount_yi"],
         },
         "scanned": len(candidates),
-        "ma5": {"count": len(ma5_rows), "stocks": ma5_rows[:STOCK_LIMIT]},
-        "ma10": {"count": len(ma10_rows), "stocks": ma10_rows[:STOCK_LIMIT]},
+        "ma5": {"count": len(ma5_rows), "stocks": ma5_rows},
+        "ma10": {"count": len(ma10_rows), "stocks": ma10_rows},
         "errors": errors,
     }

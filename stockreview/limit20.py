@@ -13,7 +13,7 @@ from . import em, net
 from .analysis import STATE_LABELS, classify_state, is_sideways, is_uptrend, pct_5d
 from .config import ALL_A_FS
 from .market import fetch_market_context
-from .utils import to_num
+from .utils import select_candidates, to_num
 
 # 统计窗口：最近 N 个交易日（含当日）
 WINDOW_DAYS = 20
@@ -144,8 +144,10 @@ def fetch_limit20_scan(date=None):
             return None
         return _classify_stock(row, info, date_index, date)
 
-    # 按成交额降序取前 MAX_CHECK 只核对（控制响应时间，涨停股池较大时）
-    codes = sorted(pool_by_code.keys(), key=lambda c: -to_num(code_map.get(c, {}).get("f6")))[:MAX_CHECK]
+    # 按成交额降序取前 MAX_CHECK 只核对（控制响应时间，涨停股池较大时），北交所保留保底席位
+    picked = select_candidates([{"code": c} for c in pool_by_code.keys()], MAX_CHECK,
+                               key=lambda r: to_num(code_map.get(r["code"], {}).get("f6")))
+    codes = [r["code"] for r in picked]
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
         hits = list(ex.map(classify, codes))
 
@@ -153,10 +155,10 @@ def fetch_limit20_scan(date=None):
     # 先统计（全量），再按状态分组排序截断输出
     uptrend_count = sum(1 for x in matched if x["state"] == "uptrend")
     sideways_count = sum(1 for x in matched if x["state"] == "sideways")
-    uptrend_stocks = sorted([x for x in matched if x["state"] == "uptrend"],
-                            key=lambda x: -x["amount_yi"])[:STOCK_LIMIT]
-    sideways_stocks = sorted([x for x in matched if x["state"] == "sideways"],
-                             key=lambda x: -x["amount_yi"])[:STOCK_LIMIT]
+    uptrend_stocks = select_candidates([x for x in matched if x["state"] == "uptrend"],
+                                       STOCK_LIMIT, key=lambda x: x["amount_yi"])
+    sideways_stocks = select_candidates([x for x in matched if x["state"] == "sideways"],
+                                        STOCK_LIMIT, key=lambda x: x["amount_yi"])
 
     return {
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

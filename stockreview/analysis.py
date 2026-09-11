@@ -5,7 +5,7 @@
 """
 from datetime import datetime
 
-from .utils import to_num
+from .utils import limit_pct, to_num
 
 
 def time_phase():
@@ -172,12 +172,8 @@ def categorize_volprice(candidates):
 # ---------- 涨停回踩筛选 ----------
 
 def limit_threshold(code):
-    """按代码段返回涨停幅度阈值。"""
-    if code.startswith(("4", "8", "92")):
-        return 29.5
-    if code.startswith(("3", "68")):
-        return 19.5
-    return 9.8
+    """按代码段返回涨停幅度阈值（北交所 30% / 创业板·科创板 20% / 主板 10%）。"""
+    return limit_pct(code)
 
 
 def build_hot_sectors(industry, zt_pool):

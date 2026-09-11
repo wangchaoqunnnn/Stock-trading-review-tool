@@ -12,7 +12,7 @@ from datetime import datetime
 
 from . import em, net
 from .config import ALL_A_FS
-from .utils import to_num
+from .utils import amount_floor, select_candidates, to_num
 
 RISK_TEXT = "本文仅为战法策略研究参考，不构成任何投资建议。回测基于历史数据，不代表未来收益。市场有风险，投资需谨慎。"
 
@@ -196,7 +196,7 @@ def fetch_tactics(date=None):
         amount = to_num(r.get("f6"))
         pct = to_num(r.get("f3"))
         turnover = to_num(r.get("f8"))
-        if amount < 5e8 or not (0.5 <= pct <= 7.0) or turnover < 3.0:
+        if amount < amount_floor(r.get("f12"), 5.0) * 100000000 or not (0.5 <= pct <= 7.0) or turnover < 3.0:
             continue
         candidates.append({
             "code": str(r.get("f12")), "name": r.get("f14"),
@@ -206,8 +206,7 @@ def fetch_tactics(date=None):
             "industry": r.get("f100"),
             "main_flow": round(to_num(r.get("f62")) / 100000000, 2),
         })
-    candidates.sort(key=lambda x: -x["amount_yi"])
-    candidates = candidates[:150]
+    candidates = select_candidates(candidates, 150, key=lambda x: x["amount_yi"])
 
     def enrich(c):
         try:

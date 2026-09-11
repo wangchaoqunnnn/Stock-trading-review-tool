@@ -6,7 +6,7 @@ from datetime import datetime
 from . import em, net
 from .analysis import VOLPRICE_CATEGORIES, categorize_volprice, compute_emotion
 from .config import ALL_A_FS
-from .utils import to_num
+from .utils import amount_floor, to_num
 
 # 全A扫描行情字段
 SCAN_FIELDS = "f2,f3,f6,f8,f10,f12,f14,f15,f16,f17,f18,f22,f62,f184,f100"
@@ -51,7 +51,7 @@ def fetch_volume_price_scan(date=None):
         turn = to_num(r.get("f8"))
         vr = to_num(r.get("f10"))
         pct = to_num(r.get("f3"))
-        if amount_v < 500000000 or not (5 <= turn <= 20):
+        if amount_v < amount_floor(r.get("f12"), 5.0) * 100000000 or not (5 <= turn <= 20):
             continue
         if not (vr >= 1.5 or vr <= 0.9):
             continue
@@ -88,6 +88,9 @@ def fetch_volume_price_scan(date=None):
             vols = [h["volume"] for h in hist]
             highs = [h["high"] for h in hist]
             amounts = [h.get("amount", 0) for h in hist]
+            if not any(amounts):
+                # 备源（腾讯/新浪，北交所常走此路径）K线无成交额字段，退回成交量口径比较
+                amounts = [h.get("volume", 0) for h in hist]
             today = hist[-1]
             prev5 = vols[-6:-1]
             prev5_avg = sum(prev5) / len(prev5) if prev5 else 0

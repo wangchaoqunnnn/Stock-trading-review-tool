@@ -15,7 +15,7 @@ from datetime import datetime
 
 from . import em, net
 from .config import ALL_A_FS
-from .utils import to_num
+from .utils import amount_floor, select_candidates, to_num
 
 RISK_TEXT = "本文为策略选股研究参考，不构成任何投资建议。市场有风险，投资需谨慎。"
 
@@ -146,7 +146,7 @@ def fetch_nshape(date=None):
         pct = to_num(r.get("f3"))
         amount = to_num(r.get("f6"))
         turnover = to_num(r.get("f8"))
-        if pct != pct or amount < MIN_AMOUNT_YI * 100000000 or not (PCT_MIN <= pct <= PCT_MAX) or turnover < 3.0:
+        if pct != pct or amount < amount_floor(r.get("f12"), MIN_AMOUNT_YI) * 100000000 or not (PCT_MIN <= pct <= PCT_MAX) or turnover < 3.0:
             continue
         candidates.append({
             "code": str(r.get("f12")), "name": r.get("f14"),
@@ -154,8 +154,7 @@ def fetch_nshape(date=None):
             "vol_ratio": round(to_num(r.get("f10")), 2),
             "industry": r.get("f100"),
         })
-    candidates.sort(key=lambda x: -x["amount_yi"])
-    candidates = candidates[:MAX_CHECK]
+    candidates = select_candidates(candidates, MAX_CHECK, key=lambda x: x["amount_yi"])
 
     # K线核对 N 型
     def enrich(c):

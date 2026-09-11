@@ -14,7 +14,7 @@ from . import em, net
 from .analysis import is_confirm_day, is_pullback_signal, support_level
 from .config import ALL_A_FS
 from .market import fetch_market_context
-from .utils import to_num
+from .utils import amount_floor, select_candidates, to_num
 
 SCAN_FIELDS = "f2,f3,f5,f6,f8,f10,f12,f14,f17,f18,f22,f62,f100"
 MIN_AMOUNT_YI = 5.0
@@ -100,14 +100,13 @@ def fetch_support_valid_scan(date=None):
         unique.append(r)
     stocks = unique
 
-    candidates = [r for r in stocks if to_num(r.get("f6")) >= MIN_AMOUNT_YI * 100000000]
-    candidates.sort(key=lambda r: -to_num(r.get("f6")))
-    candidates = candidates[:MAX_CHECK]
+    candidates = [r for r in stocks if to_num(r.get("f6")) >= amount_floor(r.get("f12"), MIN_AMOUNT_YI) * 100000000]
+    candidates = select_candidates(candidates, MAX_CHECK, key=lambda r: to_num(r.get("f6")))
 
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
         hits = [x for x in ex.map(lambda r: _check_stock(r, date), candidates) if x]
 
-    hits.sort(key=lambda x: (x["days_ago"], -x["amount_yi"]))
+    out = select_candidates(hits, STOCK_LIMIT, key=lambda x: (-x["days_ago"], x["amount_yi"]))
     return {
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "market": {
@@ -119,6 +118,6 @@ def fetch_support_valid_scan(date=None):
         "rule": "近60日低点支撑 + 缩量回踩 + 次日放量阳线确认（回测3日胜率78%）",
         "scanned": len(candidates),
         "count": len(hits),
-        "stocks": hits[:STOCK_LIMIT],
+        "stocks": out,
         "errors": errors,
     }

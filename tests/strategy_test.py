@@ -295,6 +295,19 @@ def main():
           "北交所全部代码段（430/830/870/880/920xxx）-> bj（920 不再误判为沪市）")
     check(all(x in ALL_A_FS for x in ("m:0+t:6", "m:0+t:80", "m:1+t:2", "m:1+t:23", "m:0+t:81+s:2048")),
           "全A筛选覆盖 深主/创业/沪主/科创/北交所 五大板块")
+    # 北交所不被预筛整体滤掉：成交额门槛按板块放宽
+    from stockreview.utils import amount_floor, big_loss_pct, limit_pct
+    check(amount_floor("600519", 5.0) == 5.0 and amount_floor("300750", 5.0) == 5.0
+          and amount_floor("920992", 5.0) == 0.5 and amount_floor("830799", 8.0) == 0.5,
+          "成交额预筛下限：沪深用原门槛，北交所独立放宽至 0.5 亿")
+    check(limit_pct("600519") == 9.8 and limit_pct("300750") == 19.5 and limit_pct("688981") == 19.5
+          and limit_pct("920992") == 29.5 and limit_pct("430047") == 29.5,
+          "涨停判定阈值按板块：主板 9.8 / 创业板·科创板 19.5 / 北交所 29.5")
+    check(big_loss_pct("600519") == -7.0 and big_loss_pct("300750") == -14.0 and big_loss_pct("920992") == -21.0,
+          "「大面」阈值按板块等比放大：主板 -7 / 创业板·科创板 -14 / 北交所 -21")
+    check(analysis.limit_threshold("920992") == 29.5 and analysis.limit_threshold("300750") == 19.5
+          and analysis.limit_threshold("600519") == 9.8,
+          "涨停回踩 limit_threshold 复用同一板块口径")
     rows = analysis.parse_fflow_rows(FFLOW_MAP["1.600001"])
     check(rows[0]["main_flow"] == 1.0e8 and rows[-1]["main_flow"] == 5.0e8 and rows[0]["date"] == "2026-08-10",
           "parse_fflow_rows 解析正确")
@@ -658,6 +671,35 @@ def main():
           "仅甲科技支撑位有效（缩量回踩+放量阳确认）")
     check(sv_map["甲科技"]["support"] == 9.0 and sv_map["甲科技"]["shrink_ratio"] < 0.9,
           "支撑位/缩量比字段")
+
+    # 北交所不被成交额预筛滤掉：同样 0.8 亿成交额，北交所进候选、主板被滤掉
+    net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: [
+        stock_row("920992", "北证科技", 2.0, 0.8e8, 1.2, 3.0e7, industry="专用设备"),
+        stock_row("600001", "甲科技", 2.0, 0.8e8, 1.2, 3.0e7),
+    ]
+    sv_bj = sv_mod.fetch_support_valid_scan()
+    check(sv_bj["scanned"] == 1 and sv_bj["count"] == 0,
+          "同一 0.8 亿成交额：北交所进入候选、主板（5亿门槛）被滤掉")
+
+    # 候选数超过 K 线核对上限时，北交所仍保留席位（否则会被成交额排序整体挤出）
+    net.fetch_paged = lambda fs, fields, fid="f3", po=1, limit=600: [
+        stock_row(f"60{i:04d}", f"主板{i}", 2.0, 50.0e8, 1.2, 1.0e8) for i in range(400)
+    ] + [stock_row("920992", "北证科技", 2.0, 0.8e8, 1.2, 3.0e7, industry="专用设备")]
+    checked = []
+
+    def spy_long_kline(code, limit=250, end_date=None):
+        checked.append(str(code))
+        return []
+    em.fetch_long_kline = spy_long_kline
+    sv_cap = sv_mod.fetch_support_valid_scan()
+    check(sv_cap["scanned"] == 400 and "920992" in checked,
+          "候选超上限（400只主板高成交额）时北交所仍被核对，未被成交额排序挤出")
+    em.fetch_long_kline = lambda code, limit=250, end_date=None: [dict(x) for x in SV_KLINE_MAP.get(str(code), [])]
+    from stockreview.utils import select_candidates as _select
+    _rows = [{"f12": f"60{i:04d}", "f6": 50.0e8 - i} for i in range(30)] + [{"f12": "920992", "f6": 1.0e7}]
+    _picked = _select(_rows, 10, key=lambda r: r["f6"])
+    check(len(_picked) == 10 and any(r["f12"] == "920992" for r in _picked),
+          "select_candidates：截断时北交所保底席位生效（含1只北交所）")
 
     print("== review 离线扫描 ==")
     import stockreview.review as review_mod

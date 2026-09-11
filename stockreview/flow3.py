@@ -17,7 +17,7 @@ from .analysis import (
 )
 from .config import ALL_A_FS
 from .market import fetch_market_context
-from .utils import to_num
+from .utils import select_candidates, to_num
 
 # 全A扫描行情字段（含今日主力净流入 f62）
 SCAN_FIELDS = "f2,f3,f6,f8,f10,f12,f14,f17,f18,f22,f62,f184,f100"
@@ -128,12 +128,12 @@ def fetch_flow3_scan(date=None):
 
     # ---- 个股 ----
     stock_candidates = [r for r in stocks if to_num(r.get("f62")) > 0]
-    stock_candidates.sort(key=lambda r: -to_num(r.get("f62")))
-    stock_candidates = stock_candidates[:STOCK_CHECK_LIMIT]
+    stock_candidates = select_candidates(stock_candidates, STOCK_CHECK_LIMIT,
+                                        key=lambda r: to_num(r.get("f62")))
     with ThreadPoolExecutor(max_workers=16) as ex:
         stock_hits = list(ex.map(lambda r: _stock_flow(r, date), stock_candidates))
-    inflow_stocks = sorted([x for x in stock_hits if x is not None],
-                           key=lambda x: (-x["days"], -x["streak_flow_yi"]))[:120]
+    inflow_stocks = select_candidates([x for x in stock_hits if x is not None], 120,
+                                      key=lambda x: (-x["days"], x["streak_flow_yi"]))
 
     return {
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

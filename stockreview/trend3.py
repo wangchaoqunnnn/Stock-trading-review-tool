@@ -13,7 +13,7 @@ from . import em, net
 from .analysis import is_uptrend, pct_5d, yang_streak
 from .config import ALL_A_FS
 from .market import fetch_market_context
-from .utils import to_num
+from .utils import amount_floor, select_candidates, to_num
 
 # 全A扫描行情字段
 SCAN_FIELDS = "f2,f3,f6,f8,f10,f12,f14,f17,f18,f22,f62,f184,f100"
@@ -116,15 +116,14 @@ def fetch_trend3_scan(date=None):
         return (
             close > open_ and 0 < pct <= 7
             and PRE_VOL_MIN <= vr <= PRE_VOL_MAX
-            and amount >= MIN_AMOUNT_YI * 100000000
+            and amount >= amount_floor(r.get("f12"), MIN_AMOUNT_YI) * 100000000
         )
     stock_candidates = [r for r in stocks if pre_stock(r)]
-    stock_candidates.sort(key=lambda r: -to_num(r.get("f10")))
-    stock_candidates = stock_candidates[:STOCK_CHECK_LIMIT]
+    stock_candidates = select_candidates(stock_candidates, STOCK_CHECK_LIMIT, key=lambda r: to_num(r.get("f10")))
     with ThreadPoolExecutor(max_workers=16) as ex:
         stock_hits = list(ex.map(lambda r: _check_stock(r, date), stock_candidates))
-    stock_results = sorted([x for x in stock_hits if x is not None],
-                           key=lambda x: (-x["days"], -x["pct_5d"] or 0))[:100]
+    stock_results = select_candidates([x for x in stock_hits if x is not None], 100,
+                                      key=lambda x: (-x["days"], x["pct_5d"] or 0))
 
     # ---- 板块预筛：今日阳线 + 温和放量 ----
     def pre_board(b):

@@ -6,7 +6,7 @@ from datetime import datetime
 from . import em, net
 from .analysis import build_hot_sectors, compute_emotion, evaluate_pullback
 from .config import ALL_A_FS
-from .utils import to_num
+from .utils import amount_floor, select_candidates, to_num
 
 # 回踩扫描行情字段
 SCAN_FIELDS = "f2,f3,f6,f8,f10,f12,f14,f15,f16,f18,f22,f62,f184,f100"
@@ -50,7 +50,7 @@ def fetch_pullback_scan(date=None):
         amount_v = to_num(r.get("f6"))
         pct = to_num(r.get("f3"))
         vr = to_num(r.get("f10"))
-        if amount_v < 500000000 or not (-5 <= pct <= 3) or vr > 1.2:
+        if amount_v < amount_floor(r.get("f12"), 5.0) * 100000000 or not (-5 <= pct <= 3) or vr > 1.2:
             continue
         candidates.append({
             "code": r.get("f12"),
@@ -64,8 +64,7 @@ def fetch_pullback_scan(date=None):
             "main_flow": round(to_num(r.get("f62")) / 100000000, 2),
             "industry": r.get("f100"),
         })
-    candidates.sort(key=lambda x: -x["amount_yi"])
-    candidates = candidates[:120]
+    candidates = select_candidates(candidates, 120, key=lambda x: x["amount_yi"])
 
     def enrich(c):
         try:

@@ -12,7 +12,7 @@ from . import em, net
 from .analysis import breakout_hist, breakout_short
 from .config import ALL_A_FS
 from .market import fetch_market_context
-from .utils import to_num
+from .utils import amount_floor, select_candidates, to_num
 
 # 全A扫描行情字段
 SCAN_FIELDS = "f2,f3,f5,f6,f8,f10,f12,f14,f15,f16,f17,f18,f62,f100"
@@ -91,10 +91,9 @@ def fetch_breakout_scan(date=None):
     # 预筛：今日上涨 + 流动性（历史模式预筛用实时行情近似）
     candidates = [
         r for r in stocks
-        if to_num(r.get("f3")) > 0 and to_num(r.get("f6")) >= MIN_AMOUNT_YI * 100000000
+        if to_num(r.get("f3")) > 0 and to_num(r.get("f6")) >= amount_floor(r.get("f12"), MIN_AMOUNT_YI) * 100000000
     ]
-    candidates.sort(key=lambda r: -to_num(r.get("f6")))
-    candidates = candidates[:MAX_CHECK]
+    candidates = select_candidates(candidates, MAX_CHECK, key=lambda r: to_num(r.get("f6")))
 
     with ThreadPoolExecutor(max_workers=CHECK_WORKERS) as ex:
         hits = list(ex.map(lambda r: _check_stock(r, date), candidates))
@@ -109,8 +108,8 @@ def fetch_breakout_scan(date=None):
                 short_rows.append(item)
             else:
                 hist_rows.append(item)
-    short_rows.sort(key=lambda x: -x["break_pct"])
-    hist_rows.sort(key=lambda x: -x["break_pct"])
+    short_rows = select_candidates(short_rows, STOCK_LIMIT, key=lambda x: x["break_pct"])
+    hist_rows = select_candidates(hist_rows, STOCK_LIMIT, key=lambda x: x["break_pct"])
 
     return {
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -123,7 +122,7 @@ def fetch_breakout_scan(date=None):
         "short_window": SHORT_WINDOW,
         "hist_window": HIST_LIMIT,
         "scanned": len(candidates),
-        "short": {"count": len(short_rows), "stocks": short_rows[:STOCK_LIMIT]},
-        "hist": {"count": len(hist_rows), "stocks": hist_rows[:STOCK_LIMIT]},
+        "short": {"count": len(short_rows), "stocks": short_rows},
+        "hist": {"count": len(hist_rows), "stocks": hist_rows},
         "errors": errors,
     }
