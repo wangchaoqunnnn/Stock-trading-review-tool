@@ -101,9 +101,8 @@ def fetch_market_amount():
 
 
 @ttl_cache(15)
-def fetch_breadth(date=None):
-    """涨跌家数分布（date 可选，默认当日，YYYYMMDD）。"""
-    date = date or datetime.now().strftime("%Y%m%d")
+def _official_breadth(date):
+    """东财官方涨跌分布（仅沪深两市口径，北交所不在其中）。"""
     url = f"https://push2ex.eastmoney.com/getTopicZDFenBu?ut={EMEX_UT}&dpt=wz.ztzt&Pageindex=0&pagesize=100&sort=fbt%3Aasc&date={date}"
     data = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})
     fenbu = data.get("data", {}).get("fenbu") or []
@@ -124,29 +123,110 @@ def fetch_breadth(date=None):
                 flat += v
             dist.append({"key": k, "count": v})
     dist.sort(key=lambda x: int(x["key"]))
-    return {"up": up, "down": down, "flat": flat, "distribution": dist, "date": date}
+    return {"up": up, "down": down, "flat": flat, "distribution": dist, "date": date, "covers_bj": False}
+
+
+# 官方分布口径：涨跌幅 ≥11% / ≤-11% 归入 ±11 桶
+BREADTH_BUCKET_MAX = 11
+
+# 板块展示名
+BOARD_LABELS = {"sh": "沪市", "sz": "深市", "bj": "北交所"}
+
+
+def _merge_bj_breadth(official, rows):
+    """把北交所涨跌家数并入官方（仅沪深）涨跌分布，返回 (合并后 dict, 是否实际并入)。
+
+    东财涨跌分布接口只统计沪深两市，北交所整体缺失（约 355 只），
+    直接用会导致"涨跌家数"漏掉整个北交所板块。
+    """
+    bj = {"up": 0, "down": 0, "flat": 0}
+    bj_pcts = []
+    for r in rows:
+        code = str(r.get("f12") or "")
+        if market_prefix(code) != "bj":
+            continue
+        pct = to_num(r.get("f3"))
+        if pct != pct:
+            continue
+        if pct > 0:
+            bj["up"] += 1
+        elif pct < 0:
+            bj["down"] += 1
+        else:
+            bj["flat"] += 1
+        bj_pcts.append(pct)
+    out = dict(official)
+    if bj["up"] + bj["down"] == 0:
+        # 盘前/无北交所行情：不并入，避免把整块北交所算成"平盘"
+        out["bj"] = bj
+        return out, False
+    out["up"] = to_num(official.get("up")) + bj["up"]
+    out["down"] = to_num(official.get("down")) + bj["down"]
+    out["flat"] = to_num(official.get("flat")) + bj["flat"]
+    dist = {int(x["key"]): int(x["count"]) for x in (official.get("distribution") or [])}
+    for pct in bj_pcts:
+        k = max(-BREADTH_BUCKET_MAX, min(BREADTH_BUCKET_MAX, int(round(pct))))
+        dist[k] = dist.get(k, 0) + 1
+    out["distribution"] = [{"key": str(k), "count": dist[k]} for k in sorted(dist)]
+    out["bj"] = bj
+    out["covers_bj"] = True
+    return out, True
+
+
+def fetch_breadth(date=None):
+    """涨跌家数分布（date 可选，默认当日，YYYYMMDD）。
+
+    实时口径 = 东财官方分布（沪深）+ 北交所家数补齐，覆盖沪深主板/创业板/科创板/北交所；
+    历史回放沿用官方按日期分布（官方口径仅沪深，标注 covers_bj=False）。
+    """
+    today = datetime.now().strftime("%Y%m%d")
+    date = date or today
+    official = _official_breadth(date)
+    if date != today:
+        return official
+    try:
+        rows = fetch_paged(ALL_A_FS, "f12,f3", limit=6000)
+    except Exception:
+        return official
+    merged, ok = _merge_bj_breadth(official, rows)
+    merged["source"] = "东财沪深分布 + 北交所补齐" if ok else "东财沪深分布（北交所无行情未并入）"
+    return merged
 
 
 def fetch_ex_pool(path, date=None):
-    """东方财富 push2ex 池子接口（涨停池/炸板池/跌停池）翻页抓取（并行）。"""
-    date = date or datetime.now().strftime("%Y%m%d")
+    """东方财富 push2ex 池子接口（涨停池/炸板池/跌停池）翻页抓取（并行）。
 
-    def one(page):
+    注意：跌停股没有"首次封板时间"，用 sort=fbt:asc 时接口只回 tc 不回个股列表
+    （pool 为空），因此跌停池改用 fund 排序，并在返回空列表时用其它排序兜底重试。
+    """
+    date = date or datetime.now().strftime("%Y%m%d")
+    default_sort = "fund:asc" if path == "getTopicDTPool" else "fbt:asc"
+
+    def one(page, sort):
         url = (
             f"https://push2ex.eastmoney.com/{path}?ut={EMEX_UT}&dpt=wz.ztzt"
-            f"&Pageindex={page}&pagesize=100&sort=fbt%3Aasc&date={date}"
+            f"&Pageindex={page}&pagesize=100&sort={urllib.parse.quote(sort)}&date={date}"
         )
         d = http_get_json(url, headers={"Referer": "https://quote.eastmoney.com/"})
         dd = d.get("data") or {}
         return (dd.get("pool") or []), int(dd.get("tc") or 0)
 
-    first_pool, tc = one(0)
+    first_pool, tc = one(0, default_sort)
+    if not first_pool and tc:
+        # 接口对排序字段敏感：换排序重试，避免整块池子（如跌停股）静默为空
+        for alt in ("fund:asc", "zdp:asc", "fbt:asc"):
+            if alt == default_sort:
+                continue
+            rows, tc2 = one(0, alt)
+            if rows:
+                first_pool, tc = rows, max(tc, tc2)
+                break
     pool = list(first_pool)
     pages = min(8, (max(tc, len(pool)) + 99) // 100)
     if pages > 1 and len(pool) < tc:
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=6) as ex:
-            for rows, _ in ex.map(one, range(1, pages)):
+            for rows, _ in ex.map(lambda p: one(p, default_sort), range(1, pages)):
                 pool.extend(rows)
                 if len(pool) >= tc:
                     break

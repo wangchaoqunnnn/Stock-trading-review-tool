@@ -36,6 +36,9 @@ FAKE_BREADTH = {
     "up": 2500, "down": 1800, "flat": 200,
     "distribution": [{"key": "-3", "count": 30}, {"key": "0", "count": 200}, {"key": "2", "count": 500}],
     "date": "20260814",
+    # 官方（沪深）分布 + 北交所补齐后的口径信息
+    "covers_bj": True, "source": "东财沪深分布 + 北交所补齐",
+    "bj": {"up": 60, "down": 40, "flat": 5},
 }
 FAKE_EMPTY_POOL = {"tc": 0, "pool": []}
 
@@ -308,6 +311,29 @@ def main():
     check(analysis.limit_threshold("920992") == 29.5 and analysis.limit_threshold("300750") == 19.5
           and analysis.limit_threshold("600519") == 9.8,
           "涨停回踩 limit_threshold 复用同一板块口径")
+    # 池子接口：跌停池用 fbt 排序只回 tc 不回个股，需自动换排序兜底（在打桩前用真实实现验证）
+    _orig_get = em.http_get_json
+    _urls = []
+
+    def _fake_get(url, *a, **kw):
+        _urls.append(url)
+        if "getTopicZTPool" in url:
+            return {"data": {"tc": 1, "pool": [{"c": "600001", "n": "甲科技"}]}}
+        if "getTopicDTPool" in url:
+            if "zdp" in url:
+                return {"data": {"tc": 2, "pool": [{"c": "000737", "n": "北方铜业"}, {"c": "920992", "n": "北证科技"}]}}
+            return {"data": {"tc": 2, "pool": []}}
+        return {"data": {}}
+    em.http_get_json = _fake_get
+    try:
+        _zt = em.fetch_ex_pool("getTopicZTPool", date="20260911")
+        _dt = em.fetch_ex_pool("getTopicDTPool", date="20260911")
+        check(_zt["tc"] == 1 and len(_zt["pool"]) == 1 and any("fbt" in u for u in _urls),
+              "涨停池仍用首封时间（fbt）排序")
+        check(any("fund" in u for u in _urls) and len(_dt["pool"]) == 2 and any("zdp" in u for u in _urls),
+              "跌停池：优先 fund 排序，返回空列表时换排序兜底，跌停个股不再整体丢失")
+    finally:
+        em.http_get_json = _orig_get
     rows = analysis.parse_fflow_rows(FFLOW_MAP["1.600001"])
     check(rows[0]["main_flow"] == 1.0e8 and rows[-1]["main_flow"] == 5.0e8 and rows[0]["date"] == "2026-08-10",
           "parse_fflow_rows 解析正确")
@@ -700,6 +726,26 @@ def main():
     _picked = _select(_rows, 10, key=lambda r: r["f6"])
     check(len(_picked) == 10 and any(r["f12"] == "920992" for r in _picked),
           "select_candidates：截断时北交所保底席位生效（含1只北交所）")
+
+    # 涨跌家数：东财官方分布只覆盖沪深，需补齐北交所（否则整块板块在"市场宽度"中缺失）
+    official = {"up": 2500, "down": 1800, "flat": 200,
+                "distribution": [{"key": "-11", "count": 5}, {"key": "0", "count": 200}, {"key": "11", "count": 7}],
+                "date": "20260911", "covers_bj": False}
+    bj_rows = [
+        {"f12": "920992", "f3": 2.6}, {"f12": "430047", "f3": -12.0}, {"f12": "830799", "f3": 0.0},
+        {"f12": "600001", "f3": 9.9}, {"f12": "300750", "f3": -3.0}, {"f12": "920001", "f3": None},
+    ]
+    merged, ok = em._merge_bj_breadth(official, bj_rows)
+    _dist = {x["key"]: x["count"] for x in merged["distribution"]}
+    check(ok and merged["up"] == 2501 and merged["down"] == 1801 and merged["flat"] == 201,
+          "涨跌家数补齐北交所：仅北交所计入（沪深个股不重复统计）")
+    check(_dist["3"] == 1 and _dist["-11"] == 6 and _dist["0"] == 201,
+          "北交所涨跌幅并入分布桶（±11% 封顶，与官方口径一致）")
+    check(official["up"] == 2500 and merged["covers_bj"] is True,
+          "补齐不修改官方原值，并标记 covers_bj")
+    _pre, _pre_ok = em._merge_bj_breadth(official, [{"f12": "920992", "f3": 0.0}, {"f12": "920001", "f3": None}])
+    check(_pre_ok is False and _pre["up"] == 2500 and _pre["bj"]["flat"] == 1,
+          "盘前北交所无涨跌时不并入，避免把整个北交所算成平盘")
 
     print("== review 离线扫描 ==")
     import stockreview.review as review_mod
