@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 from .config import ALL_A_FS, EMEX_UT, INDEX_UT, NEWS_KEYWORDS
 from .net import fetch_paged, http_get, http_get_json, race_fns, ttl_cache
-from .utils import to_num
+from .utils import market_prefix, to_num
 
 # 指数分时/日K回退查询使用的基础字段串
 _TRENDS_PARAMS = {
@@ -396,7 +396,7 @@ def fetch_kline_hist(code, limit=45, end_date=None):
 
     end_date: "YYYY-MM-DD" 时返回截至该日期的K线（历史回放用）。
     """
-    prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
+    prefix = market_prefix(code)
     symbol = prefix + code
 
     def _tencent():
@@ -478,7 +478,7 @@ def fetch_long_kline(code, limit=250, end_date=None):
     东财/腾讯/新浪三源并发，谁先成功用谁（东财优先，失败快速切换备源）。
     end_date: "YYYY-MM-DD" 时返回截至该日期的K线。
     """
-    prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
+    prefix = market_prefix(code)
     symbol = prefix + code
 
     def _tencent():

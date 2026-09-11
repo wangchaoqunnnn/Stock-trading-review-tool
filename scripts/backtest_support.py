@@ -33,6 +33,7 @@ sys.path.insert(0, ROOT)
 
 from stockreview.config import ALL_A_FS  # noqa: E402
 from stockreview.net import fetch_paged  # noqa: E402
+from stockreview.utils import market_prefix  # noqa: E402
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
 KLINE_DATALEN = 500  # 约 2 年日K
@@ -41,7 +42,7 @@ HORIZON = 5          # 结果窗口 5 日
 
 
 def fetch_sina_kline(code, datalen=KLINE_DATALEN):
-    prefix = "sh" if code.startswith(("6", "9")) else "bj" if code.startswith(("4", "8", "92")) else "sz"
+    prefix = market_prefix(code)
     symbol = prefix + code
     url = ("https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?"
            + urllib.parse.urlencode({"symbol": symbol, "scale": 240, "ma": "no", "datalen": datalen}))

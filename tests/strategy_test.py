@@ -283,6 +283,18 @@ def check(cond, msg):
 
 def main():
     print("== 纯函数单元测试 ==")
+    # 全交易所覆盖：前缀判定（沪主/科创/深主/创业/北交所全部代码段）
+    from stockreview.utils import market_prefix
+    from stockreview.config import ALL_A_FS
+    check(market_prefix("600519") == "sh" and market_prefix("688981") == "sh" and market_prefix("689009") == "sh"
+          and market_prefix("900901") == "sh", "沪市主板/科创板/沪B -> sh")
+    check(market_prefix("000001") == "sz" and market_prefix("002415") == "sz" and market_prefix("300750") == "sz"
+          and market_prefix("301269") == "sz", "深市主板/创业板 -> sz")
+    check(market_prefix("430047") == "bj" and market_prefix("830799") == "bj" and market_prefix("870508") == "bj"
+          and market_prefix("880000") == "bj" and market_prefix("920992") == "bj",
+          "北交所全部代码段（430/830/870/880/920xxx）-> bj（920 不再误判为沪市）")
+    check(all(x in ALL_A_FS for x in ("m:0+t:6", "m:0+t:80", "m:1+t:2", "m:1+t:23", "m:0+t:81+s:2048")),
+          "全A筛选覆盖 深主/创业/沪主/科创/北交所 五大板块")
     rows = analysis.parse_fflow_rows(FFLOW_MAP["1.600001"])
     check(rows[0]["main_flow"] == 1.0e8 and rows[-1]["main_flow"] == 5.0e8 and rows[0]["date"] == "2026-08-10",
           "parse_fflow_rows 解析正确")
